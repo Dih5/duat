@@ -15,14 +15,6 @@ Contents:
    osiris.rst
 
 
-osiris
-=========================
-
-
-.. automodule:: duat.osiris.run
-   :members:
-.. automodule:: duat.osiris.plot
-   :members:
 
 Indices and tables
 ==================

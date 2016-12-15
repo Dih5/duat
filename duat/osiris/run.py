@@ -1,4 +1,5 @@
 # -*- coding: UTF-8 -*-
+"""Run configuration files with OSIRIS."""
 from __future__ import print_function
 
 from os import path

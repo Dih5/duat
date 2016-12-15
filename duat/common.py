@@ -1,4 +1,5 @@
 # -*- coding: UTF-8 -*-
+"""Common tools."""
 
 import os
 import re
@@ -11,12 +12,12 @@ def ifd(d, v1, v2, v3):
 
     Args:
         d (int): Dimension number (1, 2, or 3).
-        v1: The value if d = 1
-        v2: The value if d = 2
-        v3: The value if d = 3
+        v1: The value if d = 1.
+        v2: The value if d = 2.
+        v3: The value if d = 3.
 
     Returns:
-        v1, v2 or v3
+        v1, v2 or v3.
 
     """
     if d == 1:
@@ -32,12 +33,23 @@ def ifd(d, v1, v2, v3):
 def human_order_key(text):
     """
     Key function to sort in human order.
+
     """
     # This is based in http://nedbatchelder.com/blog/200712/human_sorting.html
     return [int(c) if c.isdigit() else c for c in re.split('(\d+)', text)]
 
 
 def ensure_dir_exists(path):
+    """
+    Ensure a directory exists, creating it if needed.
+
+    Args:
+        path: The path to the directory.
+
+    Raises:
+        OSError: An error occurred when creating the directory.
+
+    """
     try:
         # Will fail either if exists or unable to create it
         os.makedirs(path)
@@ -51,6 +63,14 @@ def ensure_dir_exists(path):
 
 
 def ensure_executable(path, all_users=None):
+    """
+    Ensure a file is executable.
+
+    Args:
+        path (str): the path to the file.
+        all_users (bool): whether it should be make executable for the user or for all users.
+
+    """
     st = os.stat(path)
     os.chmod(path, st.st_mode | (0o111 if all_users else 0o100))
 

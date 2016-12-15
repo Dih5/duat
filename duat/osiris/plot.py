@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+"""Plot OSIRIS-generated data."""
+
 from __future__ import print_function
 from __future__ import division
 

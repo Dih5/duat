@@ -1,5 +1,5 @@
 # -*- coding: UTF-8 -*-
-
+"""Model OSIRIS configuration files."""
 from __future__ import print_function
 
 import numpy as np
