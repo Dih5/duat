@@ -1,5 +1,9 @@
+[![Github release](https://img.shields.io/github/release/dih5/duat.svg)](https://github.com/dih5/duat/releases/latest)
 [![PyPI](https://img.shields.io/pypi/v/duat.svg)](https://pypi.python.org/pypi/duat)
+
 [![license MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/Dih5/duat/master/LICENSE.txt)
+
+[![Documentation Status](https://readthedocs.org/projects/duat/badge/?version=latest)](http://duat.readthedocs.io/en/latest/?badge=latest)
 
 
 # duat
@@ -32,6 +36,8 @@ Check the notebook [intro.ipynb](https://raw.github.com/dih5/duat/master/demos/i
 
 No need to install [Jupyter notebook](http://jupyter.readthedocs.io/en/latest/install.html): you may check it online in GitHub and build a simple Python script.
 However, it is a handy way to use the package, so I suggest to use it.
+
+The updated documentation can be found [here](http://duat.readthedocs.io/en/latest/index.html#).
 
 
 ## Versioning
