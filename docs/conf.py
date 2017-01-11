@@ -36,7 +36,7 @@ if on_rtd:
         def __getattr__(cls, name):
             return Mock()
 
-    MOCK_MODULES = ['numpy', 'h5py', 'matplotlib', 'matplotlib.pyplot', 'matplot.animation']
+    MOCK_MODULES = ['numpy', 'h5py', 'matplotlib', 'matplotlib.pyplot', 'matplotlib.animation']
     sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # -- General configuration ------------------------------------------------
