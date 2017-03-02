@@ -58,14 +58,15 @@ def dim_hdf5_dir(data_path):
         return 0, 0, 0
 
 
-def time_1d(data_path, output_path=None, dataset=None, dpi=200, fps=1, scale_mode="expand", latex_label=True):
+def time_1d_animation(data_path, output_path=None, dataset=None, dpi=200, fps=1, scale_mode="expand", latex_label=True):
     """
-    Generate a time-dependent 1d plot.
+    Generate a plot in an axis animated in time.
 
     Args:
         data_path(str): The folder containing the files with the slices in time.
         output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
-        dataset (str or int): The dataset used to plot. It can be a string with the name or a int with its position in human-order among the datasets.
+        dataset (int or str): The dataset to use if multiple are available. Either an int with its position in human
+                              order or a string with its name.
         dpi (int): The resolution of the file in dots per inch.
         fps (float): The frames per seconds.
         scale_mode (str): How the scale is changed thorough time. Available methods are:
@@ -169,15 +170,15 @@ def time_1d(data_path, output_path=None, dataset=None, dpi=200, fps=1, scale_mod
     plt.close()
 
 
-# FIXME: HACK: unify with previous (?)
-def time_1d_across(data_path, output_path=None, position=None, dpi=200, fps=1, scale_mode="expand", latex_label=True):
+def time_dataset_animation(data_path, output_path=None, position=None, dpi=200, fps=1, scale_mode="expand",
+                           latex_label=True):
     """
-    Generate a time-dependent 1d plot.
+    Generate a dataset-distributed magnitude animated in time.
 
     Args:
         data_path(str): The folder containing the files with the slices in time.
         output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
-        dataset (str or int): The dataset used to plot. It can be a string with the name or a int with its position in human-order among the datasets.
+        position (int): Number of the position in the axis to plot.
         dpi (int): The resolution of the file in dots per inch.
         fps (float): The frames per seconds.
         scale_mode (str): How the scale is changed thorough time. Available methods are:
@@ -224,7 +225,11 @@ def time_1d_across(data_path, output_path=None, position=None, dpi=200, fps=1, s
     # Plot the points
     x = []
     y = []
-    # TODO: If position is none
+    if position is None:
+        position = 0
+        # Warn if implicitly selecting one among others. (Not sure if this scoring even exists, but here it goes)
+        if len(f[keys[0]]) > 1:
+            print("No position selected when multiple are available. Plotting the first one.")
     # b'   0.00000000      < Energy <=    5.00000007E-02'
     number_pattern = r'[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?'  # A pattern matching floats
     for d in keys:
@@ -277,6 +282,90 @@ def time_1d_across(data_path, output_path=None, position=None, dpi=200, fps=1, s
     plt.close()
 
 
+def time_1d_colormap(data_path, output_path=None, dataset=None, dpi=200, latex_label=True, cmap=None):
+    """
+    Generate a colormap in an axis and the time.
+
+    This function plots a magnitude depending on ONE spatial coordinate (hence the name) and on time as a colormap in
+    the cartesian product of such a magnitude and the time.
+
+    Args:
+        data_path(str): The folder containing the files with the slices in time.
+        output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
+        dataset (int or str): The dataset to use if multiple are available. Either an int with its position in human
+                              order or a string with its name.
+        dpi (int): The resolution of the file in dots per inch.
+        latex_label (bool): Whether for use LaTeX code for the plot.
+        cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
+
+    """
+    file_list = glob(os.path.join(data_path, "*.h5"))
+    file_list.sort(key=human_order_key)
+    time_list = list(map(lambda x: float((os.path.split(x)[1]).split(".h5")[0].split("-")[-1]), file_list))
+
+    f = h5py.File(file_list[0], "r")
+    keys = list(f.keys())
+
+    # Choose the dataset
+    if "AXIS" not in keys:
+        raise ValueError("AXIS group not found in file %s." % file_list[0])
+    keys.remove("AXIS")
+    if isinstance(dataset, int):
+        keys.sort(key=human_order_key)
+        data_key = keys[dataset]
+    elif isinstance(dataset, str):
+        data_key = dataset
+        if data_key not in dataset:
+            raise ValueError("Dataset %s does not exist in the file." % dataset)
+    elif dataset is None:
+        if len(keys) != 1:  # Warn if implicitly selecting one among others.
+            print("No dataset selected when multiple are available. Plotting the first one.")
+            keys.sort(key=human_order_key)
+            data_key = keys[0]
+        else:
+            data_key = keys[0]
+    else:
+        raise TypeError("Unknown dataset type: %s", type(dataset))
+    selected_dataset = f[data_key]
+
+    # Set plot labels
+    fig, ax = plt.subplots()
+    fig.set_tight_layout(True)
+    x_name = f["AXIS"]["AXIS1"].attrs["LONG_NAME"][0].decode('UTF-8')
+    x_units = f["AXIS"]["AXIS1"].attrs["UNITS"][0].decode('UTF-8')
+    y_name = "t"
+    y_units = r"1 / \omega_p"  # Consistent with outputs, do not change
+    if latex_label:
+        x_units = "$" + x_units + "$"
+        y_units = "$" + y_units + "$"
+        # Names might be text or LaTeX. Try to guess
+        if re.match("^.(_.)?$", x_name):  # If in the form x or x_i
+            x_name = "$" + x_name + "$"
+        y_name = "$" + y_name + "$"  # Y is the time, which is LaTeX here
+    ax.set_xlabel("%s (%s)" % (x_name, x_units))
+    ax.set_ylabel("%s (%s)" % (y_name, y_units))
+
+    # Gather the points
+    x_min, x_max = f["AXIS"]["AXIS1"][:]
+    z = [selected_dataset[:]]
+    for file in file_list[1:]:
+        f = h5py.File(file, "r")
+        new_dataset = f[data_key]
+        z.append(new_dataset[:])
+    z = np.asarray(z)
+    contour_plot = ax.contourf(np.linspace(x_min, x_max, num=len(selected_dataset)), time_list, z, cmap=cmap)
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(min(time_list), max(time_list))
+    fig.colorbar(contour_plot)
+
+    if not output_path:  # "" or None
+        plt.show()
+    else:
+        plt.savefig(output_path, dpi=dpi)
+
+    plt.close()
+
+
 def auto_process(run_dir=".", file_format="mp4", output_dir=None, verbose=None, kwargs_1d=None):
     """
     Automatically process the files generated by a Osiris run.
@@ -286,13 +375,14 @@ def auto_process(run_dir=".", file_format="mp4", output_dir=None, verbose=None, 
         file_format (str): The preferred format for the generated files (mp4, gif...).
         output_dir (str): Where to output the plots. Default: run_dir/plot.
         verbose (bool): Whether to print to stdout a message when a file is generated.
-        kwargs_1d (dict): Aditional keywords arguments passed to `time_1d` and `time_1d_across`
+        kwargs_1d (dict): Additional keywords arguments passed to `time_1d_animation` and `time_dataset_animation`.
 
     Returns:
         (int) Number of files generated.
 
     """
     # TODO: Pass kwargs
+    # TODO: Choose if prefer video or colormap
     if not output_dir:
         output_dir = os.path.join(run_dir, "plot")
     ensure_dir_exists(output_dir)
@@ -315,13 +405,13 @@ def auto_process(run_dir=".", file_format="mp4", output_dir=None, verbose=None, 
             v_print("Generating file(s) for " + root + "\n- Dimensions: " + str((d_spatial, d_datasets, d_time)))
             if d_spatial == 1 and d_datasets == 1:
                 v_print("- Generating: " + filename_base + "." + file_format)
-                time_1d(root, filename_base + "." + file_format, **kwargs_1d)
+                time_1d_animation(root, filename_base + "." + file_format, **kwargs_1d)
                 generated += 1
             elif d_spatial == 1:
                 chosen_datasets = [0, 1] if d_datasets == 2 else [0, d_datasets // 2, d_datasets - 1]
                 for c in chosen_datasets:
                     v_print("- Generating: " + filename_base + "_" + str(c) + "." + file_format)
-                    time_1d(root, filename_base + "_" + str(c) + "." + file_format, dataset=c, **kwargs_1d)
+                    time_1d_animation(root, filename_base + "_" + str(c) + "." + file_format, dataset=c, **kwargs_1d)
                     generated += 1
 
     return generated
