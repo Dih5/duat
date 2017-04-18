@@ -2,8 +2,9 @@
 """Run configuration files with OSIRIS."""
 from __future__ import print_function
 
-from os import path
-from shutil import copyfile, rmtree
+
+from os import path, remove, walk
+from shutil import copyfile
 import subprocess
 from time import sleep
 import sys
@@ -44,7 +45,7 @@ def set_osiris_path(folder, warn=True):
         print("Warning: osiris-3D not found in %s" % folder, file=sys.stderr)
 
 
-def run_mono(config, run_dir, prefix=None, clean_dir=False, blocking=None):
+def run_mono(config, run_dir, prefix=None, clean_dir=True, blocking=None):
     """
     Run a config file with Osiris.
 
@@ -52,7 +53,7 @@ def run_mono(config, run_dir, prefix=None, clean_dir=False, blocking=None):
         config (`ConfigFile`): the instance describing the configuration file.
         run_dir (str): Folder where the run is carried.
         prefix (str): A prefix to run the command (e.g., "qsub", ...).
-        clean_dir (bool): Whether to wipe out the directory before proceeding.
+        clean_dir (bool): Whether to remove the files in the directory before execution.
         blocking: Whether to wait for the run to finish.
 
     Returns:
@@ -64,7 +65,9 @@ def run_mono(config, run_dir, prefix=None, clean_dir=False, blocking=None):
     """
     # TODO: Daemonization
     if clean_dir:
-        rmtree(run_dir, ignore_errors=True)
+        for root, dirs, files in walk(run_dir):
+            for f in files:
+                remove(path.join(root, f))
     ensure_dir_exists(run_dir)
     config.write(path.join(run_dir, "os-stdin"))
     osiris_path = path.abspath(path.join(run_dir, "osiris"))
