@@ -58,6 +58,19 @@ def dim_hdf5_dir(data_path):
         return 0, 0, 0
 
 
+def _is_latex(s):
+    """
+
+    Decide if a string is a LaTeX expression.
+
+    Args:
+        s (str): The string to test.
+
+    Returns: (bool) True if it seems a LaTeX expression, False otherwise
+
+    """
+    return re.match("^.(_.)?$", s) or "\\" in s  # If in the form x, x_i, or if there is a backlash (command)
+
 def time_1d_animation(data_path, output_path=None, dataset=None, dpi=200, fps=1, scale_mode="expand", latex_label=True):
     """
     Generate a plot in an axis animated in time.
@@ -120,9 +133,9 @@ def time_1d_animation(data_path, output_path=None, dataset=None, dpi=200, fps=1,
         x_units = "$" + x_units + "$"
         y_units = "$" + y_units + "$"
         # Names might be text or LaTeX. Try to guess
-        if re.match("^.(_.)?$", x_name):  # If in the form x or x_i
+        if _is_latex(x_name):
             x_name = "$" + x_name + "$"
-        if re.match("^.(_.)?$", y_name):
+        if _is_latex(y_name):
             y_name = "$" + y_name + "$"
     ax.set_xlabel("%s (%s)" % (x_name, x_units))
     ax.set_ylabel("%s (%s)" % (y_name, y_units))
@@ -215,9 +228,9 @@ def time_dataset_animation(data_path, output_path=None, position=None, dpi=200, 
     if latex_label:
         y_units = "$" + y_units + "$"
         # Names might be text or LaTeX. Try to guess
-        if re.match("^.(_.)?$", x_name):  # If in the form x or x_i
+        if _is_latex(x_name):
             x_name = "$" + x_name + "$"
-        if re.match("^.(_.)?$", y_name):
+        if _is_latex(y_name):
             y_name = "$" + y_name + "$"
     ax.set_xlabel("%s" % x_name)
     ax.set_ylabel("%s (%s)" % (y_name, y_units))
@@ -339,7 +352,7 @@ def time_1d_colormap(data_path, output_path=None, dataset=None, dpi=200, latex_l
         x_units = "$" + x_units + "$"
         y_units = "$" + y_units + "$"
         # Names might be text or LaTeX. Try to guess
-        if re.match("^.(_.)?$", x_name):  # If in the form x or x_i
+        if _is_latex(x_name):
             x_name = "$" + x_name + "$"
         y_name = "$" + y_name + "$"  # Y is the time, which is LaTeX here
     ax.set_xlabel("%s (%s)" % (x_name, x_units))
