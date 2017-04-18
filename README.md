@@ -32,7 +32,7 @@ Assuming you have [Python](https://www.python.org/) with [pip](https://pip.pypa.
 
 If you are a [cool guy](https://wiki.python.org/moin/Python2orPython3) you'll prefer to use python3 and pip3 instead, unless you are a cool [Arch Linux user](https://www.archlinux.org/news/python-is-now-python-3/).
 ## Running
-Check the notebook [intro.ipynb](https://raw.github.com/dih5/duat/master/demos/intro.ipynb) for an updated example of use.
+Check the notebook [intro.ipynb](https://github.com/Dih5/duat/blob/master/demos/intro.ipynb) for an updated example of use.
 
 No need to install [Jupyter notebook](http://jupyter.readthedocs.io/en/latest/install.html): you may check it online in GitHub and build a simple Python script.
 However, it is a handy way to use the package, so I suggest to use it.
