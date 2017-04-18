@@ -22,15 +22,13 @@ def val_to_fortran(val):
     if isinstance(val, np.generic):
         val = val.item()
 
-    # TODO: d notation in fortran
-
     t = type(val)
     if t is bool:
         return ".true." if val else ".false."
     elif t is int:
         return str(val)
     elif t is float:
-        return "{:.6f}".format(val)
+        return ("%.6g" % val).replace("e", "d")
     elif t is str:
         return '"' + val + '"'
     raise TypeError("Unknown type: " + t)

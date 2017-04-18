@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-TestStar.py: Tests for the `osiris.config` module.
+TestOsirisConfig.py: Tests for the `osiris.config` module.
 """
 
 import unittest
@@ -17,10 +17,12 @@ class TestOsirisConfig(unittest.TestCase):
         self.assertEqual('""', val_to_fortran(""))
         self.assertEqual("2", val_to_fortran(2))
         self.assertEqual("-2", val_to_fortran(-2))
-        self.assertEqual("2.0", val_to_fortran(2.))
+        self.assertEqual("2", val_to_fortran(2.))
+        self.assertEqual("2.1", val_to_fortran(2.1))
         self.assertEqual("0.3", val_to_fortran(.3))
-        self.assertEqual("2.0", val_to_fortran(np.array([2.0])[0]))
-        # TODO: Test scientific notation
+        self.assertEqual("2", val_to_fortran(np.array([2.0])[0]))
+        self.assertEqual("9.87435d-07", val_to_fortran(.0000009874345))
+        self.assertEqual("-9.87435d-07", val_to_fortran(-.0000009874345))
 
     def test_get_d(self):
         for d in [1, 2, 3]:
