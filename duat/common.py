@@ -3,7 +3,7 @@
 
 import os
 import re
-import sys
+from multiprocessing import Process, Queue
 
 
 def ifd(d, v1, v2, v3):
@@ -102,3 +102,57 @@ def daemonize(func):
     # We are the grandson
     func()
     os._exit(os.EX_OK)
+
+
+class Call:
+    """Objectization of a call to be made"""
+
+    def __init__(self, fn, *args, **kwargs):
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self):
+        return self.fn(*self.args, **self.kwargs)
+
+
+def _caller(q):
+    """Execute calls from a Queue until its value is 'END'."""
+    while True:
+        data = q.get()
+        if data == "END":
+            break
+        else:
+            data()  # Call the supplied argument (lambda o Call instance)
+
+
+class MPCaller:
+    """MultiProcessing Caller. Makes calls using multiple subprocesses."""
+
+    def __init__(self, num_threads=2):
+        self.q = Queue()
+        self.processes = []
+        self.spawn_threads(num_threads)
+
+    def spawn_threads(self, num_threads):
+        """Create the required number of threads"""
+        for _ in range(num_threads):
+            t = Process(target=_caller, args=(self.q,))
+            t.daemon = True
+            t.start()
+            self.processes.append(t)
+
+    def add_call(self, call):
+        """Add a call to its stack"""
+        self.q.put(call)
+
+    def wait_calls(self):
+        """Ask all processes to consume the queue and end.
+
+        After this method is called no threads will remain. Create another instance or call spawn_threads if needed.
+        """
+        for _ in range(len(self.processes)):
+            self.q.put("END")
+        for t in self.processes:
+            t.join()
+        t.processes = []
