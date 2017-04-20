@@ -16,48 +16,6 @@ from matplotlib.animation import FuncAnimation, FFMpegWriter
 from ..common import ensure_dir_exists, human_order_key, MPCaller, Call
 
 
-def _dim_hdf5(file):
-    """
-    get the dimensions of an opened hdf5 file.
-
-    Args:
-        file(`h5py.File`): The opened file object.
-
-    Returns:
-        (tuple): A tuple with
-
-            *(int): The number of grid dimensions.
-            *(int): The number of datasets (excluding axes definition).
-    """
-    keys = list(file.keys())
-    if "AXIS" not in keys:
-        raise ValueError("AXIS group not found.")
-    return len(file["AXIS"]), len(keys) - 1
-
-
-def dim_hdf5_dir(data_path):
-    """
-    get the dimensions of the files in a diagnostic directory.
-
-    Args:
-        data_path: The directory with the files.
-
-    Returns:
-        (tuple): A tuple with:
-
-            *(int): The number of grid dimensions.
-            *(int): The number of datasets (excluding axes definition).
-            *(int): The number of snapshots in time.
-    """
-    file_list = glob(os.path.join(data_path, "*.h5"))
-    if file_list:
-        f = h5py.File(file_list[0], "r")
-        d1, d2 = _dim_hdf5(f)
-        return d1, d2, len(file_list)
-    else:
-        return 0, 0, 0
-
-
 def _is_latex(s):
     """
 
@@ -72,118 +30,186 @@ def _is_latex(s):
     return re.match("^.(_.)?$", s) or "\\" in s  # If in the form x, x_i, or if there is a backlash (command)
 
 
-def time_1d_animation(data_path, output_path=None, dataset=None, dpi=200, fps=1, scale_mode="expand", latex_label=True):
+class Diagnostic:
     """
-    Generate a plot in an axis animated in time.
+    A OSIRIS diagnostic.
 
-    Args:
-        data_path(str): The folder containing the files with the slices in time.
-        output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
-        dataset (int or str): The dataset to use if multiple are available. Either an int with its position in human
-                              order or a string with its name.
-        dpi (int): The resolution of the file in dots per inch.
-        fps (float): The frames per seconds.
-        scale_mode (str): How the scale is changed thorough time. Available methods are:
+    Attributes:
+        data_path (str): Path to the directory were the data is stored.
+        file_list (`list` of `str`): List of h5 files, one per time snapshot.
+        time_list (`list` of `str`): List of times in each snapshot.
+        keys (`list` of `str`): Names of the datasets in the Diagnostic, given in human order.
+        axes (`list` of `dict`): Info of each axis in the Diagnostic.
+        dim (`tuple` of `int`): A tuple with:
 
-            * "expand": The y limits increase when needed, but they don't decrease.
-            * "adjust_always": Always change the y limits to those of the data.
-
-        latex_label (bool): Whether for use LaTeX code for the plot.
-
-    Returns:
-
+            *The number of grid dimensions.
+            *The number of datasets (excluding axes definition).
+            *The number of snapshots in time.
     """
-    file_list = glob(os.path.join(data_path, "*.h5"))
-    file_list.sort(key=human_order_key)
-    time_list = list(map(lambda x: float((os.path.split(x)[1]).split(".h5")[0].split("-")[-1]), file_list))
 
-    # Plot the first frame
-    f = h5py.File(file_list[0], "r")
-    keys = list(f.keys())
+    def __init__(self, data_path):
+        """
+        Create a Diagnostic instance.
 
-    # Choose the dataset
-    if "AXIS" not in keys:
-        raise ValueError("AXIS group not found in file %s." % file_list[0])
-    keys.remove("AXIS")
-    if isinstance(dataset, int):
-        keys.sort(key=human_order_key)
-        data_key = keys[dataset]
-    elif isinstance(dataset, str):
-        data_key = dataset
-        if data_key not in dataset:
-            raise ValueError("Dataset %s does not exist in the file." % dataset)
-    elif dataset is None:
-        if len(keys) != 1:  # Warn if implicitly selecting one among others.
-            print("No dataset selected when multiple are available. Plotting the first one.")
-            keys.sort(key=human_order_key)
-            data_key = keys[0]
+        Args:
+            data_path: Path of the directory containing the diagnostic data
+        """
+        self.data_path = data_path
+        self.file_list = glob(os.path.join(data_path, "*.h5"))
+        self.file_list.sort(key=human_order_key)
+        self.time_list = list(
+            map(lambda x: float((os.path.split(x)[1]).split(".h5")[0].split("-")[-1]), self.file_list))
+
+        # Get info from first time snapshot
+        with h5py.File(self.file_list[0], "r") as f:
+            self.keys = self._get_keys(f)
+            self.axes = self._get_axes(f, self.keys[0])
+
+        self.dim = (len(self.axes), len(self.keys), len(self.time_list))
+
+    def _clean_dataset_key(self, dataset_key):
+        """Return the given key as str, using human order if int. Might rise error or warning"""
+        if isinstance(dataset_key, int):
+            dataset_key = self.keys[dataset_key]
+        elif isinstance(dataset_key, str):
+            if dataset_key not in self.keys:
+                raise ValueError("Dataset %s does not exist in the file." % dataset_key)
+        elif dataset_key is None:
+            if len(self.keys) != 1:  # Warn if implicitly selecting one among others.
+                print("No dataset selected when multiple are available. Plotting the first one.")
+            dataset_key = self.keys[0]
         else:
-            data_key = keys[0]
-    else:
-        raise TypeError("Unknown dataset type: %s", type(dataset))
-    selected_dataset = f[data_key]
+            raise TypeError("Unknown dataset type: %s", type(dataset_key))
+        return dataset_key
 
-    # Set plot labels
-    fig, ax = plt.subplots()
-    fig.set_tight_layout(True)
-    x_name = f["AXIS"]["AXIS1"].attrs["LONG_NAME"][0].decode('UTF-8')
-    x_units = f["AXIS"]["AXIS1"].attrs["UNITS"][0].decode('UTF-8')
-    y_name = f[data_key].attrs["LONG_NAME"][0].decode('UTF-8')
-    y_units = f[data_key].attrs["UNITS"][0].decode('UTF-8')
-    if latex_label:
-        x_units = "$" + x_units + "$"
-        y_units = "$" + y_units + "$"
-        # Names might be text or LaTeX. Try to guess
-        if _is_latex(x_name):
-            x_name = "$" + x_name + "$"
-        if _is_latex(y_name):
-            y_name = "$" + y_name + "$"
-    ax.set_xlabel("%s (%s)" % (x_name, x_units))
-    ax.set_ylabel("%s (%s)" % (y_name, y_units))
+    def get_generator_dataset(self, dataset_key):
+        """Get a generator providing data in a given dataset."""
+        dataset_key = self._clean_dataset_key(dataset_key)
 
-    # Plot the points
-    x_min, x_max = f["AXIS"]["AXIS1"][:]
-    plot_data, = ax.plot(np.linspace(x_min, x_max, num=len(selected_dataset)), selected_dataset[:])
-    ax.set_xlim(x_min, x_max)
+        def gen():
+            for file_name in self.file_list:
+                with h5py.File(file_name, "r") as f:
+                    data = f[dataset_key][:]
+                # Make sure to exit the context manager before yielding
+                # h5py might accuse you of murdering identifiers if you don't!
+                yield data
 
-    # Prepare a function for the updates
-    def update(i):
-        """Update the plot, returning the artists which must be redrawn"""
-        f = h5py.File(file_list[i], "r")
-        new_dataset = f[data_key]
-        label = 't = {0}'.format(time_list[i])
-        plot_data.set_ydata(new_dataset[:])
-        ax.set_title(label)
-        if not scale_mode:
-            pass
-        elif scale_mode == "expand":
-            prev = ax.get_ylim()
-            data_limit = [min(new_dataset), max(new_dataset)]
-            ax.set_ylim(min(prev[0], data_limit[0]), max(prev[1], data_limit[1]))
-        elif scale_mode == "adjust_always":
-            ax.set_ylim(min(new_dataset), max(new_dataset))
-        return plot_data, ax
+        return gen()
 
-    if not output_path:  # "" or None
-        # TODO: Plot in matplotlib window seems not to be working now. Perhaps jupyter-related.
-        FuncAnimation(fig, update, frames=np.arange(0, len(file_list)), interval=1)
-        plt.show()
-    elif output_path.split(".")[-1].lower() == "gif":
-        anim = FuncAnimation(fig, update, frames=np.arange(0, len(file_list)), interval=200)
-        anim.save(output_path, dpi=dpi, writer='imagemagick')
-    else:
-        metadata = dict(title=os.path.split(data_path)[-1], artist='duat', comment=data_path)
-        writer = FFMpegWriter(fps=fps, metadata=metadata)
-        with writer.saving(fig, output_path, dpi):
-            # Iterate over frames
-            for i in np.arange(0, len(file_list)):
-                update(i)
+    @staticmethod
+    def _get_keys(file):
+        """Get the dataset keys from an opened file."""
+        keys = list(file.keys())
+        if "AXIS" not in keys:
+            raise ValueError("AXIS group not found.")
+        keys.remove("AXIS")
+        keys.sort(key=human_order_key)
+        return keys
+
+    @staticmethod
+    def _get_axes(file, dataset_key=None):
+        """Get the axes info."""
+        if dataset_key is None:
+            dataset_key = Diagnostic._get_keys(file)[0]
+        axes = []
+        for i, axis in enumerate(file["AXIS"]):
+            ax = file["AXIS"][axis]
+            data = {}
+            for d in ["LONG_NAME", "UNITS", "NAME", "TYPE"]:
+                data[d] = ax.attrs[d][0].decode('UTF-8')
+            data["MIN"], data["MAX"] = ax[:]
+            # TODO: Non linear axis
+            data["LIST"] = np.linspace(data["MIN"], data["MAX"], num=file[dataset_key].shape[i])
+            axes.append(data)
+
+        return axes
+
+    def time_1d_animation(self, output_path=None, dataset_key=None, dpi=200, fps=1, scale_mode="expand",
+                          latex_label=True):
+        """
+        Generate a plot in an axis animated in time.
+
+        Args:
+            output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
+            dataset_key (int or str): The dataset to use if multiple are available. Either an int with its position in human
+                                  order or a string with its name.
+            dpi (int): The resolution of the file in dots per inch.
+            fps (float): The frames per seconds.
+            scale_mode (str): How the scale is changed thorough time. Available methods are:
+
+                * "expand": The y limits increase when needed, but they don't decrease.
+                * "adjust_always": Always change the y limits to those of the data.
+
+            latex_label (bool): Whether for use LaTeX code for the plot.
+
+        Returns:
+
+        """
+        gen = self.get_generator_dataset(dataset_key=dataset_key)
+
+        # Set plot labels
+        fig, ax = plt.subplots()
+        fig.set_tight_layout(True)
+        x_name = self.axes[0]["LONG_NAME"]
+        x_units = self.axes[0]["UNITS"]
+        dataset_key = self._clean_dataset_key(dataset_key)
+        with h5py.File(self.file_list[0], "r") as f:
+            y_name = f[dataset_key].attrs["LONG_NAME"][0].decode('UTF-8')
+            y_units = f[dataset_key].attrs["UNITS"][0].decode('UTF-8')
+        if latex_label:
+            x_units = "$" + x_units + "$"
+            y_units = "$" + y_units + "$"
+            # Names might be text or LaTeX. Try to guess
+            if _is_latex(x_name):
+                x_name = "$" + x_name + "$"
+            if _is_latex(y_name):
+                y_name = "$" + y_name + "$"
+        ax.set_xlabel("%s (%s)" % (x_name, x_units))
+        ax.set_ylabel("%s (%s)" % (y_name, y_units))
+
+        # Plot the points
+        x_min, x_max = self.axes[0]["MIN"], self.axes[0]["MAX"]
+        plot_data, = ax.plot(self.axes[0]["LIST"], next(gen))
+        ax.set_xlim(x_min, x_max)
+
+        # Prepare a function for the updates
+        def update(i):
+            """Update the plot, returning the artists which must be redrawn"""
+            new_dataset = next(gen)
+            label = 't = {0}'.format(self.time_list[i])
+            plot_data.set_ydata(new_dataset[:])
+            ax.set_title(label)
+            if not scale_mode:
+                pass
+            elif scale_mode == "expand":
+                prev = ax.get_ylim()
+                data_limit = [min(new_dataset), max(new_dataset)]
+                ax.set_ylim(min(prev[0], data_limit[0]), max(prev[1], data_limit[1]))
+            elif scale_mode == "adjust_always":
+                ax.set_ylim(min(new_dataset), max(new_dataset))
+            return plot_data, ax
+
+        if not output_path:  # "" or None
+            # FIXME: Plot in matplotlib window seems not to be working now.
+            FuncAnimation(fig, update, frames=np.arange(0, len(self.time_list)), interval=1)
+            plt.show()
+        elif output_path.split(".")[-1].lower() == "gif":
+            anim = FuncAnimation(fig, update, frames=np.arange(0, len(self.time_list)), interval=200)
+            anim.save(output_path, dpi=dpi, writer='imagemagick')
+        else:
+            metadata = dict(title=os.path.split(self.data_path)[-1], artist='duat', comment=self.data_path)
+            writer = FFMpegWriter(fps=fps, metadata=metadata)
+            with writer.saving(fig, output_path, dpi):
+                # Iterate over frames
+                for i in np.arange(1, len(self.time_list)):
+                    update(i)
+                    writer.grab_frame()
+                # Keep showing the last frame for the fixed time
                 writer.grab_frame()
-            # Keep showing the last frame for the fixed time
-            writer.grab_frame()
-    plt.close()
+        plt.close()
 
 
+# TODO: Recode. DEPRECATED
 def time_dataset_animation(data_path, output_path=None, position=None, dpi=200, fps=1, scale_mode="expand",
                            latex_label=True):
     """
@@ -296,6 +322,7 @@ def time_dataset_animation(data_path, output_path=None, position=None, dpi=200, 
     plt.close()
 
 
+# TODO: Recode. DEPRECATED
 def time_1d_colormap(data_path, output_path=None, dataset=None, dpi=200, latex_label=True, cmap=None):
     """
     Generate a colormap in an axis and the time.
@@ -422,25 +449,26 @@ def auto_process(run_dir=".", file_format="mp4", output_dir=None, verbose=None, 
             route = re.match(ms_folder + "(.*)", root).group(1)  # ... so there is no initial separator here
             route = route.replace(os.sep, "_")
             filename_base = os.path.join(output_dir, route)
-            d_spatial, d_datasets, d_time = dim_hdf5_dir(root)
+            d = Diagnostic(root)
+            d_spatial, d_datasets, d_time = d.dim
             v_print("Generating file(s) for " + root + "\n- Dimensions: " + str((d_spatial, d_datasets, d_time)))
             if d_spatial == 1 and d_datasets == 1:
                 v_print("- Generating: " + filename_base + "." + file_format)
                 if num_threads:
-                    t.add_call(Call(time_1d_animation, root, filename_base + "." + file_format, **kwargs_1d))
+                    t.add_call(Call(d.time_1d_animation, filename_base + "." + file_format, **kwargs_1d))
                 else:
-                    time_1d_animation(root, filename_base + "." + file_format, **kwargs_1d)
+                    d.time_1d_animation(filename_base + "." + file_format, **kwargs_1d)
                 generated += 1
             elif d_spatial == 1:
                 chosen_datasets = [0, 1] if d_datasets == 2 else [0, d_datasets // 2, d_datasets - 1]
                 for c in chosen_datasets:
                     v_print("- Generating: " + filename_base + "_" + str(c) + "." + file_format)
                     if num_threads:
-                        t.add_call(Call(time_1d_animation, filename_base + "_" + str(c) + "." + file_format, dataset=c,
-                                        **kwargs_1d))
+                        t.add_call(
+                            Call(d.time_1d_animation, filename_base + "_" + str(c) + "." + file_format, dataset=c,
+                                 **kwargs_1d))
                     else:
-                        time_1d_animation(root, filename_base + "_" + str(c) + "." + file_format, dataset=c,
-                                          **kwargs_1d)
+                        d.time_1d_animation(filename_base + "_" + str(c) + "." + file_format, dataset=c, **kwargs_1d)
                     generated += 1
     if num_threads:
         t.wait_calls()
