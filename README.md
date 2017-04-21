@@ -22,7 +22,7 @@ Note this package is not supported by the OSIRIS developers, use at your own ris
 The package provides an interface to the OSIRIS code, allowing:
 * Definition of input files in Python syntax. With loops and stuff.
 * Running OSIRIS from the Python interpreter.
-* Plotting results (minimal support now).
+* Plotting results, reducing multidimensional data.
 
 
 ## Installation
