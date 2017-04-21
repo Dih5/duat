@@ -42,11 +42,11 @@ class Diagnostic:
         time_list (`list` of `str`): List of times in each snapshot.
         keys (`list` of `str`): Names of the datasets in the Diagnostic, given in human order.
         axes (`list` of `dict`): Info of each axis in the Diagnostic.
-        dim (`tuple` of `int`): A tuple with:
+        shape (`tuple`): A tuple with:
 
-            * The number of grid dimensions.
-            * The number of datasets (excluding axes definition).
-            * The number of snapshots in time.
+            * `list`: The number of grid dimensions.
+            * `int`: The number of datasets (excluding axes definition).
+            * `int`: The number of snapshots in time.
     """
 
     def __init__(self, data_path):
@@ -67,7 +67,7 @@ class Diagnostic:
             self.keys = self._get_keys(f)
             self.axes = self._get_axes(f, self.keys[0])
 
-        self.dim = (len(self.axes), len(self.keys), len(self.time_list))
+        self.shape = ([len(x["LIST"]) for x in self.axes], len(self.keys), len(self.time_list))
 
     def _clean_dataset_key(self, dataset_key):
         """Return the given key as str, using human order if int. Might rise error or warning"""
@@ -116,7 +116,7 @@ class Diagnostic:
         """
         multiple_datasets = False  # If a dataset list is going to be returned
         if dataset_selector:
-            if self.dim[1] == 1:
+            if self.shape[1] == 1:
                 print("Single dataset found. Ignoring the provided dataset_selector.")
 
                 def f_dataset_selector(f):
@@ -133,7 +133,7 @@ class Diagnostic:
                         return np.apply_along_axis(dataset_selector, 0, [f[key][:] for key in self.keys])
 
         else:
-            if self.dim[1] > 1:
+            if self.shape[1] > 1:
                 multiple_datasets = True
 
                 def f_dataset_selector(f):
@@ -528,16 +528,16 @@ def auto_process(run_dir=".", file_format="mp4", output_dir=None, verbose=None, 
             route = route.replace(os.sep, "_")
             filename_base = os.path.join(output_dir, route)
             d = Diagnostic(root)
-            d_spatial, d_datasets, d_time = d.dim
-            v_print("Generating file(s) for " + root + "\n- Dimensions: " + str((d_spatial, d_datasets, d_time)))
-            if d_spatial == 1 and d_datasets == 1:
+            d_spatial, d_datasets, d_time = d.shape
+            v_print("Generating file(s) for " + root + "\n- Dimensions: " + str(d.shape))
+            if len(d_spatial) == 1 and d_datasets == 1:
                 v_print("- Generating: " + filename_base + "." + file_format)
                 if num_threads:
                     t.add_call(Call(d.time_1d_animation, filename_base + "." + file_format, **kwargs_1d))
                 else:
                     d.time_1d_animation(filename_base + "." + file_format, **kwargs_1d)
                 generated += 1
-            elif d_spatial == 1:
+            elif len(d_spatial) == 1:
                 chosen_datasets = [0, 1] if d_datasets == 2 else [0, d_datasets // 2, d_datasets - 1]
                 for c in chosen_datasets:
                     v_print("- Generating: " + filename_base + "_" + str(c) + "." + file_format)
