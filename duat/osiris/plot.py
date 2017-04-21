@@ -42,9 +42,9 @@ class Diagnostic:
         axes (`list` of `dict`): Info of each axis in the Diagnostic.
         dim (`tuple` of `int`): A tuple with:
 
-            *The number of grid dimensions.
-            *The number of datasets (excluding axes definition).
-            *The number of snapshots in time.
+            * The number of grid dimensions.
+            * The number of datasets (excluding axes definition).
+            * The number of snapshots in time.
     """
 
     def __init__(self, data_path):
@@ -82,17 +82,90 @@ class Diagnostic:
             raise TypeError("Unknown dataset type: %s", type(dataset_key))
         return dataset_key
 
-    def get_generator_dataset(self, dataset_key):
-        """Get a generator providing data in a given dataset."""
-        dataset_key = self._clean_dataset_key(dataset_key)
+    def get_generator(self, dataset_selector=None, axes_selector=None, time_selector=None):
+        """
+        Get a generator providing data from the file.
+
+        Calling this method returns a generator which, when called, will provide data for increasing times (unless
+        modified by time_selector parameter). The data might be reduced either by selecting a position in an axis (or
+        a dataset) or by using a function along some axis (or datasets), e.g. a sum.
+
+        This data is provided as numpy arrays where the first axis refers to dataset coordinate (if present) and next
+        to (non-reduced) axis in the order they are found in the files.
+
+        Args:
+            dataset_selector (str, int or callable): Instructions to reduce datasets. An int selects a dataset in human
+                order, a str selects it by name. A function taking a list and returning a scalar can be used to reduce
+                the data, e.g., sum, mean...
+
+            axes_selector (tuple): Instructions to reduce axes data. It must be
+                a tuple of the same length of the number axes or None to perform no reduction.
+                Each element can be of the following types:
+
+                    * int: Select the item in the given position.
+                    * None: No reduction is performed in this axis.
+                    * callable (default): Reduce the data along this axes using the given function (e.g., mean, max, sum...).
+
+
+            time_selector (slice): A slice instance selecting the points in time to take.
+
+        Returns: (generator): A generator which provides the data.
+
+        """
+        multiple_datasets = False  # If a dataset list is going to be returned
+        if dataset_selector:
+            if self.dim[1] == 1:
+                print("Single dataset found. Ignoring the provided dataset_selector.")
+
+                def f_dataset_selector(f):
+                    return f[self.keys[0]][:]
+            else:
+                if isinstance(dataset_selector, int):
+                    dataset_selector = self.keys[dataset_selector]
+
+                if isinstance(dataset_selector, str):  # If it was int or str
+                    def f_dataset_selector(f):
+                        return f[dataset_selector][:]
+                else:  # Assumed function
+                    def f_dataset_selector(f):
+                        return np.apply_along_axis(dataset_selector, 0, [f[key][:] for key in self.keys])
+
+        else:
+            if self.dim[1] > 1:
+                multiple_datasets = True
+
+                def f_dataset_selector(f):
+                    return np.array([f[key][:] for key in self.keys])
+            else:
+                def f_dataset_selector(f):
+                    return f[self.keys[0]][:]
+
+        if axes_selector:
+            def f_axes_selector(x):
+                offset = 1 if multiple_datasets else 0  # If multiple dataset, do not count its axis for reduction
+                for i, sel in enumerate(axes_selector):
+                    if sel is not None:
+                        if isinstance(sel, int):
+                            x = np.take(x, sel, axis=i - offset)
+                        else:  # Assumed function
+                            x = np.apply_along_axis(sel, i - offset, x)
+                        offset += 1
+                return x
+        else:
+            def f_axes_selector(x):
+                return x
+
+        if time_selector is not None and not isinstance(time_selector, slice):
+            print("Invalid time_selector parameter ignored. Use a slice instead.")
+            time_selector = None
 
         def gen():
-            for file_name in self.file_list:
+            for file_name in (self.file_list[time_selector] if time_selector else self.file_list):
                 with h5py.File(file_name, "r") as f:
-                    data = f[dataset_key][:]
+                    data = f_dataset_selector(f)
                 # Make sure to exit the context manager before yielding
                 # h5py might accuse you of murdering identifiers if you don't!
-                yield data
+                yield f_axes_selector(data)
 
         return gen()
 
@@ -124,15 +197,16 @@ class Diagnostic:
 
         return axes
 
-    def time_1d_animation(self, output_path=None, dataset_key=None, dpi=200, fps=1, scale_mode="expand",
+    def time_1d_animation(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None, dpi=200, fps=1, scale_mode="expand",
                           latex_label=True):
         """
         Generate a plot in an axis animated in time.
 
         Args:
             output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
-            dataset_key (int or str): The dataset to use if multiple are available. Either an int with its position in human
-                                  order or a string with its name.
+            dataset_selector: See `get_generator` method.
+            axes_selector: See `get_generator` method.
+            time_selector: See `get_generator` method.
             dpi (int): The resolution of the file in dots per inch.
             fps (float): The frames per seconds.
             scale_mode (str): How the scale is changed thorough time. Available methods are:
@@ -145,17 +219,17 @@ class Diagnostic:
         Returns:
 
         """
-        gen = self.get_generator_dataset(dataset_key=dataset_key)
+        gen = self.get_generator(dataset_selector=dataset_selector, axes_selector=axes_selector,
+                                 time_selector=time_selector)
 
         # Set plot labels
         fig, ax = plt.subplots()
         fig.set_tight_layout(True)
         x_name = self.axes[0]["LONG_NAME"]
         x_units = self.axes[0]["UNITS"]
-        dataset_key = self._clean_dataset_key(dataset_key)
         with h5py.File(self.file_list[0], "r") as f:
-            y_name = f[dataset_key].attrs["LONG_NAME"][0].decode('UTF-8')
-            y_units = f[dataset_key].attrs["UNITS"][0].decode('UTF-8')
+            y_name = f[self.keys[0]].attrs["LONG_NAME"][0].decode('UTF-8')
+            y_units = f[self.keys[0]].attrs["UNITS"][0].decode('UTF-8')
         if latex_label:
             x_units = "$" + x_units + "$"
             y_units = "$" + y_units + "$"
