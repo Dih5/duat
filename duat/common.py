@@ -155,4 +155,4 @@ class MPCaller:
             self.q.put("END")
         for t in self.processes:
             t.join()
-        t.processes = []
+        self.processes = []
