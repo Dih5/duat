@@ -38,6 +38,7 @@ class Diagnostic:
 
     Attributes:
         data_path (str): Path to the directory were the data is stored.
+        data_name (str): A friendly name for the data.
         file_list (`list` of `str`): List of h5 files, one per time snapshot.
         time_list (`list` of `str`): List of times in each snapshot.
         keys (`list` of `str`): Names of the datasets in the Diagnostic, given in human order.
@@ -57,6 +58,12 @@ class Diagnostic:
             data_path: Path of the directory containing the diagnostic data
         """
         self.data_path = data_path
+        try:
+            self.data_name = re.match(r".*MS(.*?)$", os.path.abspath(data_path)).group(1)  # e.g., "/FLD/b1"
+            self.data_name = self.data_name[1:].replace(os.sep, "_")
+        except AttributeError:
+            print("Unrecognized dir structure. Name will use full path.")
+            self.data_name = self.data_name.replace(os.sep, "_")
         self.file_list = glob(os.path.join(data_path, "*.h5"))
         self.file_list.sort(key=human_order_key)
         self.time_list = list(
@@ -68,6 +75,37 @@ class Diagnostic:
             self.axes = self._get_axes(f, self.keys[0])
 
         self.shape = ([len(x["LIST"]) for x in self.axes], len(self.keys), len(self.time_list))
+
+    def __repr__(self):
+        return "Diagnostic<%s %s>" % (self.data_name, str(self.shape))
+
+    @staticmethod
+    def _get_keys(file):
+        """Get the dataset keys from an opened file."""
+        keys = list(file.keys())
+        if "AXIS" not in keys:
+            raise ValueError("AXIS group not found.")
+        keys.remove("AXIS")
+        keys.sort(key=human_order_key)
+        return keys
+
+    @staticmethod
+    def _get_axes(file, dataset_key=None):
+        """Get the axes info."""
+        if dataset_key is None:
+            dataset_key = Diagnostic._get_keys(file)[0]
+        axes = []
+        for i, axis in enumerate(file["AXIS"]):
+            ax = file["AXIS"][axis]
+            data = {}
+            for d in ["LONG_NAME", "UNITS", "NAME", "TYPE"]:
+                data[d] = ax.attrs[d][0].decode('UTF-8')
+            data["MIN"], data["MAX"] = ax[:]
+            # TODO: Non linear axis
+            data["LIST"] = np.linspace(data["MIN"], data["MAX"], num=file[dataset_key].shape[i])
+            axes.append(data)
+
+        return axes
 
     def _clean_dataset_key(self, dataset_key):
         """Return the given key as str, using human order if int. Might rise error or warning"""
@@ -171,35 +209,8 @@ class Diagnostic:
 
         return gen()
 
-    @staticmethod
-    def _get_keys(file):
-        """Get the dataset keys from an opened file."""
-        keys = list(file.keys())
-        if "AXIS" not in keys:
-            raise ValueError("AXIS group not found.")
-        keys.remove("AXIS")
-        keys.sort(key=human_order_key)
-        return keys
-
-    @staticmethod
-    def _get_axes(file, dataset_key=None):
-        """Get the axes info."""
-        if dataset_key is None:
-            dataset_key = Diagnostic._get_keys(file)[0]
-        axes = []
-        for i, axis in enumerate(file["AXIS"]):
-            ax = file["AXIS"][axis]
-            data = {}
-            for d in ["LONG_NAME", "UNITS", "NAME", "TYPE"]:
-                data[d] = ax.attrs[d][0].decode('UTF-8')
-            data["MIN"], data["MAX"] = ax[:]
-            # TODO: Non linear axis
-            data["LIST"] = np.linspace(data["MIN"], data["MAX"], num=file[dataset_key].shape[i])
-            axes.append(data)
-
-        return axes
-
-    def time_1d_animation(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None, dpi=200, fps=1, scale_mode="expand",
+    def time_1d_animation(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
+                          dpi=200, fps=1, scale_mode="expand",
                           latex_label=True):
         """
         Generate a plot in an axis animated in time.
