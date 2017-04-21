@@ -27,6 +27,8 @@ def _is_latex(s):
     Returns: (bool) True if it seems a LaTeX expression, False otherwise
 
     """
+    if not s:  # Empty string is not LaTeX
+        return False
     return re.match("^.(_.)?$", s) or "\\" in s  # If in the form x, x_i, or if there is a backlash (command)
 
 
@@ -231,8 +233,10 @@ class Diagnostic:
             y_name = f[self.keys[0]].attrs["LONG_NAME"][0].decode('UTF-8')
             y_units = f[self.keys[0]].attrs["UNITS"][0].decode('UTF-8')
         if latex_label:
-            x_units = "$" + x_units + "$"
-            y_units = "$" + y_units + "$"
+            if x_units:
+                x_units = "$" + x_units + "$"
+            if y_units:
+                y_units = "$" + y_units + "$"
             # Names might be text or LaTeX. Try to guess
             if _is_latex(x_name):
                 x_name = "$" + x_name + "$"
