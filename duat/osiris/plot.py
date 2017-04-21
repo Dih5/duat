@@ -354,90 +354,70 @@ class Diagnostic:
                 writer.grab_frame()
         plt.close()
 
+    def time_1d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
+                         dpi=200, latex_label=True, cmap=None):
+        """
+        Generate a colormap in an axis and the time.
+    
+        This function plots a magnitude depending on ONE spatial coordinate (hence the name) and on time as a colormap in
+        the cartesian product of such a magnitude and the time.
+    
+        Args:
+            output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
+            dataset_selector: See `get_generator` method.
+            axes_selector: See `get_generator` method.
+            time_selector: See `get_generator` method.
+            dpi (int): The resolution of the file in dots per inch.
+            latex_label (bool): Whether for use LaTeX code for the plot.
+            cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
+    
+        """
+        axes = self.get_axes(dataset_selector=dataset_selector, axes_selector=axes_selector)
+        if len(axes) != 1:
+            raise ValueError("Expected 1 axis plot, but %d were provided" % len(axes))
+        axis = axes[0]
 
-# TODO: Recode. DEPRECATED
-def time_1d_colormap(data_path, output_path=None, dataset=None, dpi=200, latex_label=True, cmap=None):
-    """
-    Generate a colormap in an axis and the time.
+        gen = self.get_generator(dataset_selector=dataset_selector, axes_selector=axes_selector,
+                                 time_selector=time_selector)
 
-    This function plots a magnitude depending on ONE spatial coordinate (hence the name) and on time as a colormap in
-    the cartesian product of such a magnitude and the time.
+        # Set plot labels
+        fig, ax = plt.subplots()
+        fig.set_tight_layout(True)
 
-    Args:
-        data_path(str): The folder containing the files with the slices in time.
-        output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
-        dataset (int or str): The dataset to use if multiple are available. Either an int with its position in human
-                              order or a string with its name.
-        dpi (int): The resolution of the file in dots per inch.
-        latex_label (bool): Whether for use LaTeX code for the plot.
-        cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
+        x_name = axis["LONG_NAME"]
+        x_units = axis["UNITS"]
+        y_name = "t"
+        y_units = r"1 / \omega_p"  # Consistent with outputs, do not change
 
-    """
-    file_list = glob(os.path.join(data_path, "*.h5"))
-    file_list.sort(key=human_order_key)
-    time_list = list(map(lambda x: float((os.path.split(x)[1]).split(".h5")[0].split("-")[-1]), file_list))
+        if latex_label:
+            if x_units:
+                x_units = "$" + x_units + "$"
+            if y_units:
+                y_units = "$" + y_units + "$"
+            # Names might be text or LaTeX. Try to guess
+            if _is_latex(x_name):
+                x_name = "$" + x_name + "$"
+            if _is_latex(y_name):
+                y_name = "$" + y_name + "$"
+        ax.set_xlabel("%s (%s)" % (x_name, x_units))
+        ax.set_ylabel("%s (%s)" % (y_name, y_units))
 
-    f = h5py.File(file_list[0], "r")
-    keys = list(f.keys())
+        time_list = self.time_list[time_selector] if time_selector else self.time_list
 
-    # Choose the dataset
-    if "AXIS" not in keys:
-        raise ValueError("AXIS group not found in file %s." % file_list[0])
-    keys.remove("AXIS")
-    if isinstance(dataset, int):
-        keys.sort(key=human_order_key)
-        data_key = keys[dataset]
-    elif isinstance(dataset, str):
-        data_key = dataset
-        if data_key not in dataset:
-            raise ValueError("Dataset %s does not exist in the file." % dataset)
-    elif dataset is None:
-        if len(keys) != 1:  # Warn if implicitly selecting one among others.
-            print("No dataset selected when multiple are available. Plotting the first one.")
-            keys.sort(key=human_order_key)
-            data_key = keys[0]
+        # Gather the points
+        x_min, x_max = axis["MIN"], axis["MAX"]
+        z = np.asarray(list(gen))
+        contour_plot = ax.contourf(axis["LIST"], time_list, z, cmap=cmap)
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(time_list[0], time_list[-1])
+        fig.colorbar(contour_plot)
+
+        if not output_path:  # "" or None
+            plt.show()
         else:
-            data_key = keys[0]
-    else:
-        raise TypeError("Unknown dataset type: %s", type(dataset))
-    selected_dataset = f[data_key]
+            plt.savefig(output_path, dpi=dpi)
 
-    # Set plot labels
-    fig, ax = plt.subplots()
-    fig.set_tight_layout(True)
-    x_name = f["AXIS"]["AXIS1"].attrs["LONG_NAME"][0].decode('UTF-8')
-    x_units = f["AXIS"]["AXIS1"].attrs["UNITS"][0].decode('UTF-8')
-    y_name = "t"
-    y_units = r"1 / \omega_p"  # Consistent with outputs, do not change
-    if latex_label:
-        x_units = "$" + x_units + "$"
-        y_units = "$" + y_units + "$"
-        # Names might be text or LaTeX. Try to guess
-        if _is_latex(x_name):
-            x_name = "$" + x_name + "$"
-        y_name = "$" + y_name + "$"  # Y is the time, which is LaTeX here
-    ax.set_xlabel("%s (%s)" % (x_name, x_units))
-    ax.set_ylabel("%s (%s)" % (y_name, y_units))
-
-    # Gather the points
-    x_min, x_max = f["AXIS"]["AXIS1"][:]
-    z = [selected_dataset[:]]
-    for file in file_list[1:]:
-        f = h5py.File(file, "r")
-        new_dataset = f[data_key]
-        z.append(new_dataset[:])
-    z = np.asarray(z)
-    contour_plot = ax.contourf(np.linspace(x_min, x_max, num=len(selected_dataset)), time_list, z, cmap=cmap)
-    ax.set_xlim(x_min, x_max)
-    ax.set_ylim(min(time_list), max(time_list))
-    fig.colorbar(contour_plot)
-
-    if not output_path:  # "" or None
-        plt.show()
-    else:
-        plt.savefig(output_path, dpi=dpi)
-
-    plt.close()
+        plt.close()
 
 
 def get_diagnostic_list(run_dir="."):
