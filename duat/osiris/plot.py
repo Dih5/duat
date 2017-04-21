@@ -382,7 +382,6 @@ class Diagnostic:
 
         # Set plot labels
         fig, ax = plt.subplots()
-        fig.set_tight_layout(True)
 
         x_name = axis["LONG_NAME"]
         x_units = axis["UNITS"]
