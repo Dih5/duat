@@ -65,6 +65,8 @@ class Diagnostic:
             print("Unrecognized dir structure. Name will use full path.")
             self.data_name = self.data_name.replace(os.sep, "_")
         self.file_list = glob(os.path.join(data_path, "*.h5"))
+        if not self.file_list:
+            raise ValueError("No diagnostic data found in %s" % data_path)
         self.file_list.sort(key=human_order_key)
         self.time_list = list(
             map(lambda x: float((os.path.split(x)[1]).split(".h5")[0].split("-")[-1]), self.file_list))
