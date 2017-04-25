@@ -2,15 +2,17 @@
 """Run configuration files with OSIRIS."""
 from __future__ import print_function
 
-
 from os import path, remove, walk
 from shutil import copyfile
 import subprocess
-from time import sleep
+from time import sleep, time
 import sys
 import re
+import warnings
 
-from ..common import ensure_dir_exists, ensure_executable, ifd
+from ..common import ensure_dir_exists, ensure_executable, ifd, tail
+
+import psutil
 
 # Path to osiris executables - guessed later in the code
 osiris_1d = ""
@@ -45,29 +47,138 @@ def set_osiris_path(folder, warn=True):
         print("Warning: osiris-3D not found in %s" % folder, file=sys.stderr)
 
 
-def run_mono(config, run_dir, prefix=None, clean_dir=True, blocking=None):
+class Run:
     """
-    Run a config file with Osiris.
+    An osiris run.
+    
+    Attributes:
+        run_dir (str): Directory where the run takes place.
+        total_steps (int): Amount of time steps in the simulation.
+        process (psutil.Process): Representation of the process running the simulation.
+        
+    Notes:
+        Only single-process runs are supported at the moment.
+    """
+
+    def __init__(self, run_dir, total_steps=None):
+        self.run_dir = run_dir
+        self.total_steps = total_steps
+        # TODO: Read total_steps from file if not provided
+
+        candidates = []
+        for proc in psutil.process_iter():
+            try:
+                pinfo = proc.as_dict(attrs=['pid', 'exe'])
+            except psutil.NoSuchProcess:
+                pass
+            else:
+                if pinfo["exe"] and pinfo['exe'] == path.join(self.run_dir, "osiris"):
+                    candidates.append(pinfo['pid'])
+
+        try:
+            if not candidates:  # No process running found
+                self.process = None
+            elif len(candidates) > 1:
+                warnings.warn("More than one pid was found for the run.\n"
+                              "Multiple processes are not really handled by duat yet, do not trust what you see.")
+                self.process = psutil.Process(candidates[0])
+            else:
+                self.process = psutil.Process(candidates[0])
+        except psutil.NoSuchProcess:
+            # If the process have died before processing was completed.
+            self.process = None
+
+    def __repr__(self):
+        if self.is_running():  # Process has not finished yet
+            return "Run<%s (%s/%d)>" % (self.run_dir, self.current_item(), self.total_steps)
+        else:
+            # Badly configured runs also return 0, so do not display the useless return code
+            if self.has_error():
+                return "Run<%s [FAILED]>" % (self.run_dir,)
+            else:
+                return "Run<%s>" % (self.run_dir,)
+
+    def current_item(self):
+        """
+        Find the current simulation step.
+        
+        Returns: (int) The simulation step or -1 if it could not be found.
+
+        """
+        last_line = tail(path.join(self.run_dir, "out.txt"), 8)
+        if not last_line:  # Empty file
+            return -1
+        if re.search("now at  t", last_line[-1]):
+            return int(re.match(r".* n = *(.*?)$", last_line[-1]).group(1))
+        elif " Osiris run completed normally\n" in last_line:
+            return self.total_steps
+        else:
+            return -1
+
+    def is_running(self):
+        """Return True if the simulation is known to be running, or False otherwise."""
+        if self.process is None:
+            return False
+        return self.process.is_running()
+
+    def terminate(self):
+        """Terminate the OSIRIS process (if running)."""
+        if self.process is not None:
+            return self.process.terminate()
+
+    def estimated_time(self):
+        """
+        Estimated time to end the simulation in seconds.
+        
+        The estimation uses a linear model and considers initialization negligible.
+        The modification time of the os-stdin file is used in the calculation. If altered, estimation will be meaningless.
+        
+        Returns: (float) The estimation of the time to end the simulation or NaN if no estimation could be done.
+
+        """
+        if not self.is_running():  # Already finished
+            return 0
+        else:
+            current = self.current_item()
+            if current <= 0:  # If not started or error
+                return float('nan')
+            else:
+                elapsed = time() - path.getmtime(path.join(self.run_dir, "os-stdin"))
+                return elapsed * (self.total_steps / current - 1)
+
+    def has_error(self):
+        """Search for common error messages in the output file."""
+        # TODO: Cache result if reached execution with no error
+        with open(path.join(self.run_dir, "out.txt"), "r") as f:
+            text = f.read()
+        # TODO: Optimize this search
+        if "(*error*)" in text or re.search("Error reading .* parameters", text) or re.search("MPI_ABORT was invoked",
+                                                                                              text):
+            return True
+        else:
+            return False
+
+
+def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None):
+    """
+    Initiate a OSIRIS run from a config instance.
 
     Args:
-        config (`ConfigFile`): the instance describing the configuration file.
+        config (`ConfigFile`): The instance describing the configuration file.
         run_dir (str): Folder where the run is carried.
         prefix (str): A prefix to run the command (e.g., "qsub", ...).
         clean_dir (bool): Whether to remove the files in the directory before execution.
         blocking: Whether to wait for the run to finish.
 
     Returns:
-        (tuple): A tuple with:
-
-            * (bool): Whether the started run found an error in the very first ms.
-            * (`subprocess.Popen`): A Popen instance of the started run.
+        (tuple): A Run instance describing the execution.
 
     """
-    # TODO: Daemonization
     if clean_dir:
         for root, dirs, files in walk(run_dir):
             for f in files:
                 remove(path.join(root, f))
+
     ensure_dir_exists(run_dir)
     config.write(path.join(run_dir, "os-stdin"))
     osiris_path = path.abspath(path.join(run_dir, "osiris"))
@@ -83,21 +194,20 @@ def run_mono(config, run_dir, prefix=None, clean_dir=True, blocking=None):
     proc = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
     if blocking:
         proc.wait()
-    else:  # Sleep a little to check for quickly appearing errors
+    else:  # Sleep a little to check for quickly appearing errors and to allow the shell to start osiris
         sleep(0.2)
+
+    # BEWARE: Perhaps under extreme circumstances, OSIRIS might have not started despite sleeping.
+    # This could be solved reinstantiating RUN. Consider it a feature instead of a bug :P
+
+    run = Run(run_dir, total_steps=(config["time"]["tmax"] - config["time"]["tmin"]) // config["time_step"]["dt"] + 1)
+
     # Try to detect errors checking the output
-    with open(path.join(run_dir, "out.txt"), "r") as f:
-        text = f.read()
-    # TODO: Optimize this search
-    if "(*error*)" in text or re.search("Error reading .* parameters", text) or re.search("MPI_ABORT was invoked",
-                                                                                          text):
+    if run.has_error():
         print(
             "Error detected while launching %s.\nCheck out.txt there for more information or re-run in console." % run_dir,
             file=sys.stderr)
-        success = False
-    else:
-        success = True
-    return success, proc
+    return run
 
 
 # Try to guess the OSIRIS location:

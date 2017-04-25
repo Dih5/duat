@@ -156,3 +156,38 @@ class MPCaller:
         for t in self.processes:
             t.join()
         self.processes = []
+
+
+def tail(path, lines=1, _step=4098):
+    """
+    Get the last lines of a file.
+    
+    Args:
+        path: Path to the file to read.
+        lines: Number of lines to read.
+        _step: Size of the step used in the search.
+
+    Returns: (list of str): The lines found.
+
+    """
+    # Adapted from glenbot's answer to:
+    # http://stackoverflow.com/questions/136168/get-last-n-lines-of-a-file-with-python-similar-to-tail
+    f = open(path, "r")
+    lines_found = []
+    block_counter = -1
+    while len(lines_found) < lines:
+        try:
+            f.seek(block_counter * _step, os.SEEK_END)
+        except IOError:  # either file is too small, or too many lines requested
+            # read all and exit loop
+            f.seek(0)
+            lines_found = f.readlines()
+            break
+
+        lines_found = f.readlines()
+
+        if len(lines_found) > lines:
+            break
+        block_counter -= 1
+
+    return lines_found[-lines:]

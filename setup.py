@@ -23,7 +23,7 @@ on_rtd = environ.get('READTHEDOCS') == 'True'
 if on_rtd:
     require_list = []
 else:
-    require_list = ['h5py', 'numpy', 'matplotlib', 'future']
+    require_list = ['h5py', 'numpy', 'matplotlib', 'psutil', 'future']
 
 setup(
     name='duat',
