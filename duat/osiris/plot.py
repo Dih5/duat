@@ -24,7 +24,7 @@ def _is_latex(s):
     Args:
         s (str): The string to test.
 
-    Returns: (bool) True if it seems a LaTeX expression, False otherwise
+    Returns: (bool) True if it seems a LaTeX expression, False otherwise.
 
     """
     if not s:  # Empty string is not LaTeX
@@ -49,6 +49,7 @@ class Diagnostic:
             * `list`: The number of grid dimensions.
             * `int`: The number of datasets (excluding axes definition).
             * `int`: The number of snapshots in time.
+            
     """
 
     def __init__(self, data_path):
@@ -56,7 +57,8 @@ class Diagnostic:
         Create a Diagnostic instance.
 
         Args:
-            data_path: Path of the directory containing the diagnostic data
+            data_path: Path of the directory containing the diagnostic data.
+            
         """
         self.data_path = data_path
         try:
@@ -127,14 +129,14 @@ class Diagnostic:
             for d in ["LONG_NAME", "UNITS", "NAME", "TYPE"]:
                 data[d] = ax.attrs[d][0].decode('UTF-8')
             data["MIN"], data["MAX"] = ax[:]
-            # TODO: Non linear axis
+            # TODO: Non linear axis support
             data["LIST"] = np.linspace(data["MIN"], data["MAX"], num=file[dataset_key].shape[i])
             axes.append(data)
 
         return axes
 
     def _clean_dataset_key(self, dataset_key):
-        """Return the given key as str, using human order if int. Might rise error or warning"""
+        """Return the given dataset key as str, using human order if int. Might raise error or warning."""
         if isinstance(dataset_key, int):
             dataset_key = self.keys[dataset_key]
         elif isinstance(dataset_key, str):
@@ -154,7 +156,7 @@ class Diagnostic:
 
         Calling this method returns a generator which, when called, will provide data for increasing times (unless
         modified by time_selector parameter). The data might be reduced either by selecting a position in an axis (or
-        a dataset) or by using a function along some axis (or datasets), e.g. a sum.
+        a dataset) or by using a function along some axis (or datasets), e.g., a sum.
 
         This data is provided as numpy arrays where the first axis refers to dataset coordinate (if present) and next
         to (non-reduced) axis in the order they are found in the files.
@@ -236,6 +238,17 @@ class Diagnostic:
         return gen()
 
     def get_axes(self, dataset_selector=None, axes_selector=None):
+        """
+        Get a dictionary with the info of the axes obtained as result of a given reduction.
+        
+        Args:
+            dataset_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            axes_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+
+        Returns:
+            (list of dict) Ordered list of the axes left by the reduction.
+            
+        """
         axes = []
         if dataset_selector is not None:
             if self.shape[1] == 1:
@@ -258,23 +271,21 @@ class Diagnostic:
                           dpi=200, fps=1, scale_mode="expand",
                           latex_label=True):
         """
-        Generate a plot in an axis animated in time.
+        Generate a plot of 1d data animated in time.
 
         Args:
             output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
-            dataset_selector: See `get_generator` method.
-            axes_selector: See `get_generator` method.
-            time_selector: See `get_generator` method.
-            dpi (int): The resolution of the file in dots per inch.
-            fps (float): The frames per seconds.
+            dataset_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            axes_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            time_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            dpi (int): The resolution of the frames in dots per inch.
+            fps (int): The frames per seconds.
             scale_mode (str): How the scale is changed thorough time. Available methods are:
 
                 * "expand": The y limits increase when needed, but they don't decrease.
                 * "adjust_always": Always change the y limits to those of the data.
 
             latex_label (bool): Whether for use LaTeX code for the plot.
-
-        Returns:
 
         """
         axes = self.get_axes(dataset_selector=dataset_selector, axes_selector=axes_selector)
@@ -316,7 +327,7 @@ class Diagnostic:
 
         # Prepare a function for the updates
         def update(i):
-            """Update the plot, returning the artists which must be redrawn"""
+            """Update the plot, returning the artists which must be redrawn."""
             try:
                 new_dataset = next(gen)
             except StopIteration:
@@ -364,9 +375,9 @@ class Diagnostic:
     
         Args:
             output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
-            dataset_selector: See `get_generator` method.
-            axes_selector: See `get_generator` method.
-            time_selector: See `get_generator` method.
+            dataset_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            axes_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            time_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
             dpi (int): The resolution of the file in dots per inch.
             latex_label (bool): Whether for use LaTeX code for the plot.
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
@@ -427,7 +438,7 @@ def get_diagnostic_list(run_dir="."):
         run_dir (str): The run directory.
 
     Returns:
-        (list of Diagnostic) List of the diagnostic found
+        (list of Diagnostic) List of the diagnostic found.
 
     """
     diagnostic_list = []

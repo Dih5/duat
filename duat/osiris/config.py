@@ -13,9 +13,9 @@ def val_to_fortran(val):
     Transform a value to fortran code.
 
     Args:
-        val:
+        val: The value to translate.
 
-    Returns:
+    Returns: (str) The fortran code.
 
     """
     # Convert numpy types
@@ -42,7 +42,7 @@ def par_to_fortran(name, val):
         name (str): The name of the parameter.
         val: The value of the parameter.
 
-    Returns: A string which assigns the value to the parameter
+    Returns: A string which assigns the value to the parameter.
 
     """
     # Convert numpy types
@@ -78,9 +78,7 @@ def par_to_fortran(name, val):
 
 
 class MetaSection:
-    """
-    Something behaving like a set of sections
-    """
+    """Something behaving like a set of sections."""
 
     def __str__(self):
         return self.to_fortran()
@@ -90,9 +88,7 @@ class MetaSection:
 
 
 class Section(MetaSection):
-    """
-    The class defining a configuration block
-    """
+    """The class defining a configuration block."""
 
     def __init__(self, name, param=None):
         self.name = name
@@ -132,6 +128,7 @@ class SectionList(MetaSection):
     Class defining a list of sections in a numerical order.
 
     Here 'section' refers to any subclass of `MetaSection`.
+    
     """
 
     def __init__(self, label=None, lst=None):
@@ -156,6 +153,7 @@ class SectionOrdered(MetaSection):
     Class defining a set of sections that must be outputted in a particular order given by a keyword related to them.
 
     Here 'section' refers to any subclass of `MetaSection`.
+    
     """
 
     def __init__(self, label=None, order=None, fixed=True, types=None):
@@ -191,7 +189,7 @@ class SectionOrdered(MetaSection):
         self.set_section(key, value)
 
     def set_section(self, name, section=None):
-        """ Add or replace a section"""
+        """ Add or replace a section."""
         if not section:  # No section was given
             section = Section(name) if "_list" not in name else SectionList(label=name)
         if isinstance(section, str):  # A string was given (abuse of notation)
@@ -219,9 +217,7 @@ class SectionOrdered(MetaSection):
 
 
 class Species(SectionOrdered):
-    """
-    Set of sections defining a species
-    """
+    """Set of sections defining a species."""
 
     # Keep the default order as a class variable, but copy to the instance to allow modification
     order = ["species", "profile", "spe_bound", "diag_species"]
@@ -260,7 +256,7 @@ class Species(SectionOrdered):
 
 class ConfigFile(SectionOrdered):
     """
-    Set of Sections defining an input file
+    Set of Sections defining an input file.
     """
     order = ["simulation", "node_conf", "grid", "time_step", "restart", "space", "time", "el_mag_fld", "emf_bound",
              "smooth", "diag_emf", "particles", "species_list", "cathode_list", "neutral_list", "neutral_mov_ions_list",
@@ -276,10 +272,11 @@ class ConfigFile(SectionOrdered):
 
     def __init__(self, d):
         """
-        Create a default d-dimensional config file
+        Create a default d-dimensional config file.
 
         Args:
-            d(int): The number of dimensions (1, 2 or 3)
+            d(int): The number of dimensions (1, 2 or 3).
+            
         """
         SectionOrdered.__init__(self, order=ConfigFile.order, fixed=True, types=ConfigFile.types)
 
@@ -324,10 +321,11 @@ class ConfigFile(SectionOrdered):
 
     def get_d(self):
         """
-        Get the dimension of the configuration filed
+        Get the dimension of the configuration filed.
 
         Returns:
             (int): The dimension according to the mandatory xmax parameter in the space section.
+            
         """
         x_max = self["space"]["xmax"]
         return len(x_max) if isinstance(x_max, list) else 1
