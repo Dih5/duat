@@ -315,8 +315,15 @@ class Diagnostic:
                 x_name = "$" + x_name + "$"
             if _is_latex(y_name):
                 y_name = "$" + y_name + "$"
-        ax.set_xlabel("%s (%s)" % (x_name, x_units))
-        ax.set_ylabel("%s (%s)" % (y_name, y_units))
+
+        if x_units:
+            ax.set_xlabel("%s (%s)" % (x_name, x_units))
+        else:
+            ax.set_xlabel("%s" % (x_name,))
+        if y_units:
+            ax.set_ylabel("%s (%s)" % (y_name, y_units))
+        else:
+            ax.set_ylabel("%s" % (y_name,))
 
         # Plot the points
         x_min, x_max = axis["MIN"], axis["MAX"]
@@ -409,8 +416,15 @@ class Diagnostic:
                 x_name = "$" + x_name + "$"
             if _is_latex(y_name):
                 y_name = "$" + y_name + "$"
-        ax.set_xlabel("%s (%s)" % (x_name, x_units))
-        ax.set_ylabel("%s (%s)" % (y_name, y_units))
+
+        if x_units:
+            ax.set_xlabel("%s (%s)" % (x_name, x_units))
+        else:
+            ax.set_xlabel("%s" % (x_name,))
+        if y_units:
+            ax.set_ylabel("%s (%s)" % (y_name, y_units))
+        else:
+            ax.set_ylabel("%s" % (y_name,))
 
         time_list = self.time_list[time_selector] if time_selector else self.time_list
 
