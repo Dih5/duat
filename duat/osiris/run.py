@@ -47,6 +47,20 @@ def set_osiris_path(folder, warn=True):
         print("Warning: osiris-3D not found in %s" % folder, file=sys.stderr)
 
 
+def _find_running_exe(exe):
+    """Return the list of the pid of the processes of the argument executable (absolute path)"""
+    candidates = []
+    for proc in psutil.process_iter():
+        try:
+            pinfo = proc.as_dict(attrs=['pid', 'exe'])
+        except psutil.NoSuchProcess:
+            pass
+        else:
+            if pinfo["exe"] and pinfo['exe'] == exe:
+                candidates.append(pinfo['pid'])
+    return candidates
+
+
 class Run:
     """
     An osiris run.
@@ -65,15 +79,7 @@ class Run:
         self.total_steps = total_steps
         # TODO: Read total_steps from file if not provided
 
-        candidates = []
-        for proc in psutil.process_iter():
-            try:
-                pinfo = proc.as_dict(attrs=['pid', 'exe'])
-            except psutil.NoSuchProcess:
-                pass
-            else:
-                if pinfo["exe"] and pinfo['exe'] == path.join(self.run_dir, "osiris"):
-                    candidates.append(pinfo['pid'])
+        candidates = _find_running_exe(path.join(self.run_dir, "osiris"))
 
         try:
             if not candidates:  # No process running found
@@ -159,7 +165,7 @@ class Run:
             return False
 
 
-def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None):
+def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, force=None):
     """
     Initiate a OSIRIS run from a config instance.
 
@@ -168,16 +174,34 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None):
         run_dir (str): Folder where the run is carried.
         prefix (str): A prefix to run the command (e.g., "qsub", ...).
         clean_dir (bool): Whether to remove the files in the directory before execution.
-        blocking: Whether to wait for the run to finish.
+        blocking (bool): Whether to wait for the run to finish.
+        force (str): Set what to do if a running executable is found in the directory. Set to "ignore" to launch anyway,
+                     possibly resulting in multiple instances running simultaneously; set to "kill" to terminate the
+                     existing processes.
 
     Returns:
         (tuple): A Run instance describing the execution.
 
     """
+    candidates = _find_running_exe(path.join(run_dir, "osiris"))
+    if candidates:
+        if force == "ignore":
+            print("Warning: Ignored running exe found in %s" % run_dir)
+        elif force == "kill":
+            print("Warning: Killing %d running exe found in %s" % (len(candidates),run_dir))
+            for c in candidates:
+                psutil.Process(c).terminate()
+        else:
+            print("Warning: Running exe found in %s. Aborting launch." % run_dir)
+            return
     if clean_dir:
         for root, dirs, files in walk(run_dir):
             for f in files:
                 remove(path.join(root, f))
+
+        for root, dirs, files in walk(run_dir):
+            for f in files:
+                print("Warning: could not remove file %s" % f)
 
     ensure_dir_exists(run_dir)
     config.write(path.join(run_dir, "os-stdin"))
