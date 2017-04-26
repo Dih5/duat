@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
-from ..common import ensure_dir_exists, human_order_key, MPCaller, Call
+from ..common import ensure_dir_exists, human_order_key, MPCaller, Call, logger
 
 
 def _is_latex(s):
@@ -70,7 +70,7 @@ class Diagnostic:
             self.data_name = re.match(r".*MS(.*?)$", os.path.abspath(data_path)).group(1)  # e.g., "/FLD/b1"
             self.data_name = self.data_name[1:].replace(os.sep, "_")
         except AttributeError:
-            print("Unrecognized dir structure. Name will use full path.")
+            logger.warning("Unrecognized dir structure. Name will use full path.")
             self.data_name = self.data_name.replace(os.sep, "_")
         self.file_list = glob(os.path.join(data_path, "*.h5"))
         if not self.file_list:
@@ -149,7 +149,7 @@ class Diagnostic:
                 raise ValueError("Dataset %s does not exist in the file." % dataset_key)
         elif dataset_key is None:
             if len(self.keys) != 1:  # Warn if implicitly selecting one among others.
-                print("No dataset selected when multiple are available. Plotting the first one.")
+                logger.warning("No dataset selected when multiple are available. Plotting the first one.")
             dataset_key = self.keys[0]
         else:
             raise TypeError("Unknown dataset type: %s", type(dataset_key))
@@ -188,7 +188,7 @@ class Diagnostic:
         multiple_datasets = False  # If a dataset list is going to be returned
         if dataset_selector is not None:
             if self.shape[1] == 1:
-                print("Single dataset found. Ignoring the provided dataset_selector.")
+                logger.warning("Single dataset found. Ignoring the provided dataset_selector.")
 
                 def f_dataset_selector(f):
                     return f[self.keys[0]][:]
@@ -229,7 +229,7 @@ class Diagnostic:
                 return x
 
         if time_selector is not None and not isinstance(time_selector, slice):
-            print("Invalid time_selector parameter ignored. Use a slice instead.")
+            logger.warning("Invalid time_selector parameter ignored. Use a slice instead.")
             time_selector = None
 
         def gen():
@@ -257,7 +257,7 @@ class Diagnostic:
         axes = []
         if dataset_selector is not None:
             if self.shape[1] == 1:
-                print("Single dataset found. Ignoring the provided dataset_selector.")
+                logger.warning("Single dataset found. Ignoring the provided dataset_selector.")
                 # Anyhow, datasets are reduced, so skip
 
         elif self.shape[1] > 1:
@@ -343,7 +343,7 @@ class Diagnostic:
             try:
                 new_dataset = next(gen)
             except StopIteration:
-                print("Warning: Tried to add a frame but all data was used")
+                logger.warning("Warning: Tried to add a frame but all data was used")
                 return
             label = 't = {0}'.format(time_list[i])
             plot_data.set_ydata(new_dataset[:])

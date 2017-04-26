@@ -1,16 +1,14 @@
 # -*- coding: UTF-8 -*-
 """Run configuration files with OSIRIS."""
-from __future__ import print_function
+
 
 from os import path, remove, walk
 from shutil import copyfile
 import subprocess
 from time import sleep, time
-import sys
 import re
-import warnings
 
-from ..common import ensure_dir_exists, ensure_executable, ifd, tail
+from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger
 
 import psutil
 
@@ -27,24 +25,24 @@ def set_osiris_path(folder, warn=True):
     global osiris_1d, osiris_2d, osiris_3d
     if not path.isdir(folder):
         if warn:
-            print("Warning: %s is not an existing folder." % folder, file=sys.stderr)
+            logger.warning("%s is not an existing folder." % folder)
         return
 
     r = path.join(folder, "osiris-1D.e")
     if path.isfile(r):
         osiris_1d = r
     elif warn:
-        print("Warning: osiris-1D not found in %s" % folder, file=sys.stderr)
+        logger.warning("osiris-1D not found in %s" % folder)
     r = path.join(folder, "osiris-2D.e")
     if path.isfile(r):
         osiris_2d = r
     elif warn:
-        print("Warning: osiris-2D not found in %s" % folder, file=sys.stderr)
+        logger.warning("osiris-2D not found in %s" % folder)
     r = path.join(folder, "osiris-3D.e")
     if path.isfile(r):
         osiris_3d = r
     elif warn:
-        print("Warning: osiris-3D not found in %s" % folder, file=sys.stderr)
+        logger.warning("osiris-3D not found in %s" % folder)
 
 
 def _find_running_exe(exe):
@@ -92,7 +90,7 @@ class Run:
             if not candidates:  # No process running found
                 self.process = None
             elif len(candidates) > 1:
-                warnings.warn("More than one pid was found for the run.\n"
+                logger.warning("More than one pid was found for the run.\n"
                               "Multiple processes are not really handled by duat yet, do not trust what you see.")
                 self.process = psutil.Process(candidates[0])
             else:
@@ -193,17 +191,18 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
     candidates = _find_running_exe(path.join(run_dir, "osiris"))
     if candidates:
         if force == "ignore":
-            print("Warning: Ignored running exe found in %s" % run_dir)
+            logger.warning("Ignored %d running exe found in %s" % (len(candidates), run_dir))
         elif force == "kill":
-            print("Warning: Killing %d running exe found in %s" % (len(candidates), run_dir))
+            logger.warning("Killing %d running exe found in %s" % (len(candidates), run_dir))
             for c in candidates:
                 try:
                     psutil.Process(c).terminate()
                 except psutil.NoSuchProcess:
                     pass  # If just ended
         else:
-            print("Warning: Running exe found in %s. Aborting launch." % run_dir)
+            logger.warning("Running exe found in %s. Aborting launch." % run_dir)
             return
+
     if clean_dir:
         for root, dirs, files in walk(run_dir):
             for f in files:
@@ -211,7 +210,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
 
         for root, dirs, files in walk(run_dir):
             for f in files:
-                print("Warning: could not remove file %s" % f)
+                logger.warning("Could not remove file %s" % f)
 
     ensure_dir_exists(run_dir)
     config.write(path.join(run_dir, "os-stdin"))
@@ -238,9 +237,8 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
 
     # Try to detect errors checking the output
     if run.has_error():
-        print(
-            "Error detected while launching %s.\nCheck out.txt there for more information or re-run in console." % run_dir,
-            file=sys.stderr)
+        logger.warning(
+            "Error detected while launching %s.\nCheck out.txt there for more information or re-run in console." % run_dir)
     return run
 
 
@@ -253,13 +251,12 @@ for t in [path.join(path.expanduser("~"), "osiris", "bin"),
 
 if not (osiris_1d and osiris_2d and osiris_3d):
     if not (osiris_1d or osiris_2d or osiris_3d):
-        print("Warning: no OSIRIS executables were found.", file=sys.stderr)
+        logger.warning("Warning: no OSIRIS executables were found.")
     else:
         if not osiris_1d:
-            print("Warning: osiris-1D.e not found.", file=sys.stderr)
+            logger.warning("Warning: osiris-1D.e not found.")
         if not osiris_2d:
-            print("Warning: osiris-2D.e not found.", file=sys.stderr)
+            logger.warning("Warning: osiris-2D.e not found.")
         if not osiris_3d:
-            print("Warning: osiris-3D.e not found.", file=sys.stderr)
-    print("Use the function set_osiris_path or set the variables run.osiris_1d and so to allow the run module to work.",
-          file=sys.stderr)
+            logger.warning("Warning: osiris-3D.e not found.")
+        logger.warning("Use the function set_osiris_path or set the variables run.osiris_1d and so to allow the run module to work.")

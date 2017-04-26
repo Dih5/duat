@@ -4,6 +4,7 @@
 import os
 import re
 from multiprocessing import Process, Queue
+import logging
 
 
 def ifd(d, v1, v2, v3):
@@ -191,3 +192,7 @@ def tail(path, lines=1, _step=4098):
         block_counter -= 1
 
     return lines_found[-lines:]
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.Logger("duat")
+

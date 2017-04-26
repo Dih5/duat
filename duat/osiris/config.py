@@ -1,11 +1,9 @@
 # -*- coding: UTF-8 -*-
 """Model OSIRIS configuration files."""
-from __future__ import print_function
 
 import numpy as np
-import sys
 
-from ..common import ifd
+from ..common import ifd, logger
 
 
 def val_to_fortran(val):
@@ -160,7 +158,7 @@ class SectionOrdered(MetaSection):
         self.label = label if label else ""
         if not order:
             if fixed:
-                print("A ConfigSectionOrdered instance with no order defined cannot be fixed.", file=sys.stderr)
+                logger.warning("A ConfigSectionOrdered instance with no order defined cannot be fixed.")
             self.fixed = False
             self.order = []
         else:
@@ -180,7 +178,6 @@ class SectionOrdered(MetaSection):
             self.subsections[name] = self.types[name](name)
             return self.subsections[name]
         else:
-            print(self.types)
             raise ValueError("Subsection %s cannot be implicitly created due to unknown type." % name)
 
     def __setitem__(self, key, value):
