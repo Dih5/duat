@@ -50,6 +50,11 @@ class Diagnostic:
             * `int`: The number of datasets (excluding axes definition).
             * `int`: The number of snapshots in time.
             
+    Note: The axes list is provided in the order of the numpy convention for arrays. This is the opposite of order used
+        to label the axes in the hdf5 files. For example in a 2d array the first axes will be the labeled as AXIS2, and
+        the second will be AXIS1. Unless the user makes use of other external tools to read the data, he/she can safely
+        ignore this note.
+            
     """
 
     def __init__(self, data_path):
@@ -123,7 +128,7 @@ class Diagnostic:
         if dataset_key is None:
             dataset_key = Diagnostic._get_keys(file)[0]
         axes = []
-        for i, axis in enumerate(file["AXIS"]):
+        for i, axis in enumerate(reversed(list(file["AXIS"].keys()))):
             ax = file["AXIS"][axis]
             data = {}
             for d in ["LONG_NAME", "UNITS", "NAME", "TYPE"]:
