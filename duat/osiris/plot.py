@@ -293,6 +293,8 @@ class Diagnostic:
             latex_label (bool): Whether for use LaTeX code for the plot.
 
         """
+        if output_path:
+            ensure_dir_exists(os.path.dirname(output_path))
         axes = self.get_axes(dataset_selector=dataset_selector, axes_selector=axes_selector)
         if len(axes) != 1:
             raise ValueError("Expected 1 axis plot, but %d were provided" % len(axes))
@@ -395,6 +397,8 @@ class Diagnostic:
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
     
         """
+        if output_path:
+            ensure_dir_exists(os.path.dirname(output_path))
         axes = self.get_axes(dataset_selector=dataset_selector, axes_selector=axes_selector)
         if len(axes) != 1:
             raise ValueError("Expected 1 axis plot, but %d were provided" % len(axes))
