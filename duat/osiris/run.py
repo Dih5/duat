@@ -72,12 +72,19 @@ class Run:
         
     Notes:
         Only single-process runs are supported at the moment.
+        
     """
 
-    def __init__(self, run_dir, total_steps=None):
+    def __init__(self, run_dir):
         self.run_dir = run_dir
-        self.total_steps = total_steps
-        # TODO: Read total_steps from file if not provided
+        # TODO: Handle exceptions
+        with open(path.join(run_dir, "os-stdin"), "r") as f:
+            text = f.read()
+        dt = float(re.match(r".*time_step(.*?){(.*?)dt(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE).group(4))
+        tmin = float(re.match(r".*time(.*?){(.*?)tmin(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE).group(4))
+        tmax = float(re.match(r".*time(.*?){(.*?)tmax(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE).group(4))
+
+        self.total_steps = int((tmax - tmin) // dt) + 1
 
         candidates = _find_running_exe(path.join(self.run_dir, "osiris"))
 
@@ -96,7 +103,7 @@ class Run:
 
     def __repr__(self):
         if self.is_running():  # Process has not finished yet
-            return "Run<%s (%s/%d)>" % (self.run_dir, self.current_item(), self.total_steps)
+            return "Run<%s (%s/%d)>" % (self.run_dir, self.current_step(), self.total_steps)
         else:
             # Badly configured runs also return 0, so do not display the useless return code
             if self.has_error():
@@ -104,7 +111,7 @@ class Run:
             else:
                 return "Run<%s>" % (self.run_dir,)
 
-    def current_item(self):
+    def current_step(self):
         """
         Find the current simulation step.
         
@@ -145,7 +152,7 @@ class Run:
         if not self.is_running():  # Already finished
             return 0
         else:
-            current = self.current_item()
+            current = self.current_step()
             if current <= 0:  # If not started or error
                 return float('nan')
             else:
@@ -188,9 +195,12 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         if force == "ignore":
             print("Warning: Ignored running exe found in %s" % run_dir)
         elif force == "kill":
-            print("Warning: Killing %d running exe found in %s" % (len(candidates),run_dir))
+            print("Warning: Killing %d running exe found in %s" % (len(candidates), run_dir))
             for c in candidates:
-                psutil.Process(c).terminate()
+                try:
+                    psutil.Process(c).terminate()
+                except psutil.NoSuchProcess:
+                    pass  # If just ended
         else:
             print("Warning: Running exe found in %s. Aborting launch." % run_dir)
             return
@@ -224,7 +234,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
     # BEWARE: Perhaps under extreme circumstances, OSIRIS might have not started despite sleeping.
     # This could be solved reinstantiating RUN. Consider it a feature instead of a bug :P
 
-    run = Run(run_dir, total_steps=(config["time"]["tmax"] - config["time"]["tmin"]) // config["time_step"]["dt"] + 1)
+    run = Run(run_dir)
 
     # Try to detect errors checking the output
     if run.has_error():
