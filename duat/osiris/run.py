@@ -135,7 +135,34 @@ class Run:
     def terminate(self):
         """Terminate the OSIRIS process (if running)."""
         if self.process is not None:
-            return self.process.terminate()
+            if self.process.is_running():
+                try:
+                    self.process.terminate()
+                except psutil.NoSuchProcess:
+                    # The process has just terminated
+                    pass
+            else:
+                logger.warning("The process had already stopped")
+        else:
+            logger.warning("Asked for termination of a Run with no known process")
+
+    def kill(self):
+        """
+        Abruptly terminate the OSIRIS process (if running).
+        
+        The :func:`~duat.osiris.run.Run.terminate` method should be used instead to perform a cleaner exit.
+        """
+        if self.process is not None:
+            if self.process.is_running():
+                try:
+                    self.process.kill()
+                except psutil.NoSuchProcess:
+                    # The process has just terminated
+                    pass
+            else:
+                logger.warning("The process had already stopped")
+        else:
+            logger.warning("Asked for termination of a Run with no known process")
 
     def estimated_time(self):
         """
