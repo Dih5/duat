@@ -63,6 +63,15 @@ def ensure_dir_exists(path):
             raise OSError("Unable to create directory " + path)
 
 
+def get_dir_size(dir_path):
+    """Get the size of a directory in bytes."""
+    total_size = 0
+    for root, dirs, files in os.walk(dir_path):
+        for f in files:
+            total_size += os.path.getsize(os.path.join(root, f))
+    return total_size
+
+
 def ensure_executable(path, all_users=None):
     """
     Ensure a file is executable.

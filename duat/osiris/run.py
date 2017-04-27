@@ -8,7 +8,7 @@ import subprocess
 from time import sleep, time
 import re
 
-from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger
+from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size
 
 import psutil
 
@@ -156,6 +156,10 @@ class Run:
             else:
                 elapsed = time() - path.getmtime(path.join(self.run_dir, "os-stdin"))
                 return elapsed * (self.total_steps / current - 1)
+
+    def get_size(self):
+        """Get the size of all run data in bytes."""
+        return get_dir_size(self.run_dir)
 
     def has_error(self):
         """Search for common error messages in the output file."""
