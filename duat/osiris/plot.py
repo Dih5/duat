@@ -11,6 +11,7 @@ import re
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 from ..common import ensure_dir_exists, human_order_key, MPCaller, Call, logger
@@ -380,7 +381,7 @@ class Diagnostic:
         plt.close()
 
     def time_1d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
-                         dpi=200, latex_label=True, cmap=None):
+                         dpi=200, latex_label=True, cmap=None, log_map=False):
         """
         Generate a colormap in an axis and the time.
     
@@ -395,6 +396,7 @@ class Diagnostic:
             dpi (int): The resolution of the file in dots per inch.
             latex_label (bool): Whether for use LaTeX code for the plot.
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
+            log_map (bool): Whether the map is plot in log scale.
     
         """
         if output_path:
@@ -440,9 +442,16 @@ class Diagnostic:
         # Gather the points
         x_min, x_max = axis["MIN"], axis["MAX"]
         z = np.asarray(list(gen))
-        contour_plot = ax.contourf(axis["LIST"], time_list, z, cmap=cmap)
+        if log_map:
+            # Mask manually to prevent a UserWarning
+            contour_plot = ax.contourf(axis["LIST"], time_list, np.ma.masked_where(z <= 0, z),
+                                       locator=ticker.LogLocator(), cmap=cmap)
+        else:
+            contour_plot = ax.contourf(axis["LIST"], time_list, z, cmap=cmap)
+
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(time_list[0], time_list[-1])
+
         fig.colorbar(contour_plot)
 
         if not output_path:  # "" or None
