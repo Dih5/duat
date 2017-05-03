@@ -40,8 +40,11 @@ class Diagnostic:
     Attributes:
         data_path (str): Path to the directory were the data is stored.
         data_name (str): A friendly name for the data.
+        dt (float): The time step between snapshots of a consecutive number.
+        t_0 (float): The time of the first snapshot.
+        time_units (str): The name of the unit of time.
         file_list (`list` of `str`): List of h5 files, one per time snapshot.
-        time_list (`list` of `str`): List of times in each snapshot.
+        snapshot_list (`list` of `int`): List of integers identifying the snapshots. Multiply by dt to get time.
         keys (`list` of `str`): Names of the datasets in the Diagnostic, given in human order.
         axes (`list` of `dict`): Info of each axis in the Diagnostic.
         datasets_as_axis(`dict`): Info of datasets if treated as axes. WARNING: Only used with energy bins.
@@ -67,21 +70,18 @@ class Diagnostic:
             
         """
         self.data_path = data_path
-        try:
-            self.data_name = re.match(r".*MS(.*?)$", os.path.abspath(data_path)).group(1)  # e.g., "/FLD/b1"
-            self.data_name = self.data_name[1:].replace(os.sep, "_")
-        except AttributeError:
-            logger.warning("Unrecognized dir structure. Name will use full path.")
-            self.data_name = self.data_name.replace(os.sep, "_")
         self.file_list = glob(os.path.join(data_path, "*.h5"))
         if not self.file_list:
             raise ValueError("No diagnostic data found in %s" % data_path)
         self.file_list.sort(key=human_order_key)
-        self.time_list = list(
-            map(lambda x: float((os.path.split(x)[1]).split(".h5")[0].split("-")[-1]), self.file_list))
+        self.snapshot_list = list(
+            map(lambda x: int((os.path.split(x)[1]).split(".h5")[0].split("-")[-1]), self.file_list))
 
         # Get info from first time snapshot
         with h5py.File(self.file_list[0], "r") as f:
+            self.data_name = f.attrs["NAME"][0].decode('UTF-8')
+            self.t_0 = f.attrs["TIME"][0]
+            self.time_units = f.attrs["TIME UNITS"][0].decode('UTF-8')
             self.keys = self._get_keys(f)
             self.axes = self._get_axes(f, self.keys[0])
             if len(self.keys) > 1:
@@ -104,11 +104,17 @@ class Diagnostic:
                 self.datasets_as_axis["LIST"] = dataset_axes
                 self.datasets_as_axis["MIN"] = dataset_axes[0]
                 self.datasets_as_axis["MAX"] = dataset_axes[-1]
-                self.datasets_as_axis["UNITS"] = "(?)"
+                self.datasets_as_axis["UNITS"] = "?"
             else:
                 self.datasets_as_axis = None
 
-        self.shape = ([len(x["LIST"]) for x in self.axes], len(self.keys), len(self.time_list))
+        if len(self.file_list) < 2:
+            self.dt = 0
+        else:
+            with h5py.File(self.file_list[1], "r") as f:
+                self.dt = f.attrs["TIME"][0] / self.snapshot_list[1] - self.t_0
+
+        self.shape = ([len(x["LIST"]) for x in self.axes], len(self.keys), len(self.snapshot_list))
 
     def __repr__(self):
         return "Diagnostic<%s %s>" % (self.data_name, str(self.shape))
@@ -273,6 +279,22 @@ class Diagnostic:
                 axes.append(a)
         return axes
 
+    def get_time_list(self, time_selector=None):
+        """
+        Get the list of times obtained as a result of a given slice.
+        
+        Args:
+            time_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method. 
+
+        Returns:
+
+        """
+        if time_selector:
+            # This could be improved to avoid generating unneeded values
+            return [self.t_0 + self.dt * i for i in self.snapshot_list][time_selector]
+        else:
+            return [self.t_0 + self.dt * i for i in self.snapshot_list]
+
     def time_1d_animation(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
                           dpi=200, fps=1, scale_mode="expand",
                           latex_label=True):
@@ -338,7 +360,7 @@ class Diagnostic:
         plot_data, = ax.plot(axis["LIST"], next(gen))
         ax.set_xlim(x_min, x_max)
 
-        time_list = self.time_list[time_selector] if time_selector else self.time_list
+        time_list = self.get_time_list(time_selector)
 
         # Prepare a function for the updates
         def update(i):
@@ -404,6 +426,8 @@ class Diagnostic:
         axes = self.get_axes(dataset_selector=dataset_selector, axes_selector=axes_selector)
         if len(axes) != 1:
             raise ValueError("Expected 1 axis plot, but %d were provided" % len(axes))
+        if len(self.file_list) < 2:
+            raise ValueError("Unable to plot a colormap with only one time snapshot")
         axis = axes[0]
 
         gen = self.get_generator(dataset_selector=dataset_selector, axes_selector=axes_selector,
@@ -415,7 +439,7 @@ class Diagnostic:
         x_name = axis["LONG_NAME"]
         x_units = axis["UNITS"]
         y_name = "t"
-        y_units = r"1 / \omega_p"  # Consistent with outputs, do not change
+        y_units = self.time_units
 
         if latex_label:
             if x_units:
@@ -437,7 +461,7 @@ class Diagnostic:
         else:
             ax.set_ylabel("%s" % (y_name,))
 
-        time_list = self.time_list[time_selector] if time_selector else self.time_list
+        time_list = self.get_time_list(time_selector)
 
         # Gather the points
         x_min, x_max = axis["MIN"], axis["MAX"]
