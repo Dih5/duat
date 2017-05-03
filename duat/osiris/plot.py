@@ -40,6 +40,7 @@ class Diagnostic:
     Attributes:
         data_path (str): Path to the directory were the data is stored.
         data_name (str): A friendly name for the data.
+        units (str): The name of the unit the magnitude is measured in.
         dt (float): The time step between snapshots of a consecutive number.
         t_0 (float): The time of the first snapshot.
         time_units (str): The name of the unit of time.
@@ -79,12 +80,14 @@ class Diagnostic:
 
         # Get info from first time snapshot
         with h5py.File(self.file_list[0], "r") as f:
-            self.data_name = f.attrs["NAME"][0].decode('UTF-8')
             self.t_0 = f.attrs["TIME"][0]
             self.time_units = f.attrs["TIME UNITS"][0].decode('UTF-8')
             self.keys = self._get_keys(f)
             self.axes = self._get_axes(f, self.keys[0])
+            self.units = f[self.keys[0]].attrs["UNITS"][0].decode('UTF-8')
             if len(self.keys) > 1:
+                # Take a general name from the global attribute
+                self.data_name = f.attrs["NAME"][0].decode('UTF-8')
                 # Construct an axes-like object representing the dataset
                 self.datasets_as_axis = {}
                 # Guess name
@@ -106,6 +109,9 @@ class Diagnostic:
                 self.datasets_as_axis["MAX"] = dataset_axes[-1]
                 self.datasets_as_axis["UNITS"] = "?"
             else:
+                # Take a specific name from the dataset
+                self.data_name = f[self.keys[0]].attrs["LONG_NAME"][0].decode('UTF-8')
+                # No axes-like object in this case
                 self.datasets_as_axis = None
 
         if len(self.file_list) < 2:
@@ -440,17 +446,23 @@ class Diagnostic:
         x_units = axis["UNITS"]
         y_name = "t"
         y_units = self.time_units
+        title_name = self.data_name
+        title_units = self.units
 
         if latex_label:
             if x_units:
                 x_units = "$" + x_units + "$"
             if y_units:
                 y_units = "$" + y_units + "$"
+            if title_units:
+                title_units = "$" + title_units + "$"
             # Names might be text or LaTeX. Try to guess
             if _is_latex(x_name):
                 x_name = "$" + x_name + "$"
             if _is_latex(y_name):
                 y_name = "$" + y_name + "$"
+            if _is_latex(title_name):
+                title_name = "$" + title_name + "$"
 
         if x_units:
             ax.set_xlabel("%s (%s)" % (x_name, x_units))
@@ -475,6 +487,8 @@ class Diagnostic:
 
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(time_list[0], time_list[-1])
+
+        ax.set_title("%s (%s)" % (title_name, title_units))
 
         fig.colorbar(contour_plot)
 
