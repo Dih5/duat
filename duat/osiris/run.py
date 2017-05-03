@@ -273,6 +273,25 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
     return run
 
 
+def run_variation(config, variation, run_base, **kwargs):
+    """
+    Make consecutive calls to :func:`~duat.osiris.run.run_config` with ConfigFiles generated from a variation.
+    Args:
+        config (`ConfigFile`): Base configuration file.
+        variation (`Variation`): Description of the variations to apply.
+        run_base (str): Path to the directory where the runs will take place, each in a folder named var_number.
+        **kwargs: Keyword arguments to pass to :func:`~duat.osiris.run.run_config`
+
+    Returns: (list): List with the return values of each call.
+
+    """
+    r_list = []
+    for i, c in enumerate(variation.get_generator(config)):
+        r = run_config(c, path.join(run_base, "var_" + str(i)), **kwargs)
+        r_list.append(r)
+    return r_list
+
+
 # Try to guess the OSIRIS location:
 for t in [path.join(path.expanduser("~"), "osiris", "bin"),
           path.join("usr", "local", "osiris", "bin")]:
