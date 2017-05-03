@@ -226,8 +226,8 @@ class Species(SectionOrdered):
 
         self.set_section("species",
                          Section("species",
-                                 {"num_par_max": 2048, "rqm": -1.0, "num_par_x": [2] * d, "vth": [0.1] * 3,
-                                        "vfl": [0.0, 0.0, 0.6], "den_min": 1.0e-5, "num_dgam": 0, "dgam": 0}))
+                                 {"num_par_max": 2048, "rqm": -1.0, "num_par_x": [2] * d, "vth": [0.0] * 3,
+                                        "vfl": [0.0] * 3}))
 
         default_profile = ifd(d, {"fx": [[1., 1., 1., 1., 1., 1.]],
                                   "x": [[0., 0.9999, 1.000, 2.000, 2.001, 10000.]]},
