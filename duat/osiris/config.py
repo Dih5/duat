@@ -1,6 +1,9 @@
 # -*- coding: UTF-8 -*-
 """Model OSIRIS configuration files."""
 
+import copy
+from itertools import product
+
 import numpy as np
 
 from ..common import ifd, logger
@@ -326,3 +329,73 @@ class ConfigFile(SectionOrdered):
         """
         x_max = self["space"]["xmax"]
         return len(x_max) if isinstance(x_max, list) else 1
+
+
+class Variation:
+    """
+    Represents a variation of a set of parameters in config files.
+    
+    Each parameter varies in list of values. The configuration files produced by this class take into account all
+    combinations of values, i.e., the parameter space is given by the cartesian product.
+    
+    """
+    def __init__(self, *args):
+        """
+        Create a Variation with the given parameters and values.
+        
+        Args:
+            *args (2-tuple of lists): Each argument must be a 2-tuple whose first elements is a list of str or int which
+                                      identifies the parameter in its section and a list of the values the parameter
+                                      will take.
+        """
+        self.parameters = args
+        self._par_names = [p[0][-1] for p in self.parameters]
+        self.len_list = [len(p[1]) for p in self.parameters]
+
+    def __repr__(self):
+        return "Variation<%s (%s)>" % (" x ".join(self._par_names), "x".join([str(x) for x in self.len_list]))
+
+    def get_generator(self, config):
+        """
+        Get a generator that produces ConfigFile objects following the Variation.
+        
+        Args:
+            config (ConfigFile): The configuration where the Variation will be applied.
+
+        Returns:
+            (generator): A generator which provides the ConfigFile instances.
+
+        """
+        paths = [p[0] for p in self.parameters]
+        values = [p[1] for p in self.parameters]
+
+        def gen():
+            for value in product(*values):  # Value is multidimensional in general
+                c = copy.deepcopy(config)
+                for i, path in enumerate(paths):  # For the i-th thing to change
+                    place = c  # Start from the root
+                    for level in path[:-1]:  # ... access the leaf...
+                        place = place[level]
+                    place.set_par(path[-1], value[i])  # ... changing its value
+
+                yield c
+        return gen()
+
+    def get_parameter_list(self):
+        """
+        Get a list with the parameter values in the same order that
+        :func:`~duat.osiris.config.Variation.get_generator`.
+        
+        This method might be useful to post-process the results if the parameter space is simple.
+
+        Returns:
+            (list of tuples): A list with the values of the parameters in the cartesian product order.
+
+        """
+        values = [p[1] for p in self.parameters]
+        return list(product(*values))
+
+
+
+
+
