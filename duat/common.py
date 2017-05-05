@@ -45,7 +45,7 @@ def ensure_dir_exists(path):
     Ensure a directory exists, creating it if needed.
 
     Args:
-        path: The path to the directory.
+        path (str): The path to the directory.
 
     Raises:
         OSError: An error occurred when creating the directory.
@@ -160,6 +160,7 @@ class MPCaller:
         """Ask all processes to consume the queue and end.
 
         After this method is called no threads will remain. Create another instance or call spawn_threads if needed.
+        
         """
         for _ in range(len(self.processes)):
             self.q.put("END")
@@ -173,11 +174,12 @@ def tail(path, lines=1, _step=4098):
     Get the last lines of a file.
     
     Args:
-        path: Path to the file to read.
-        lines: Number of lines to read.
-        _step: Size of the step used in the search.
+        path (str): Path to the file to read.
+        lines (int): Number of lines to read.
+        _step (int): Size of the step used in the search.
 
-    Returns: (list of str): The lines found.
+    Returns:
+        :obj:`list` of :obj:`str`: The lines found.
 
     """
     # Adapted from glenbot's answer to:

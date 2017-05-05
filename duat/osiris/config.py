@@ -11,12 +11,13 @@ from ..common import ifd, logger
 
 def val_to_fortran(val):
     """
-    Transform a value to fortran code.
+    Transform a value to Fortran code.
 
     Args:
         val: The value to translate.
 
-    Returns: (str) The fortran code.
+    Returns: 
+        str: The Fortran code.
 
     """
     # Convert numpy types
@@ -43,7 +44,8 @@ def par_to_fortran(name, val):
         name (str): The name of the parameter.
         val: The value of the parameter.
 
-    Returns: A string which assigns the value to the parameter.
+    Returns:
+        str: A string which assigns the value to the parameter.
 
     """
     # Convert numpy types
@@ -324,7 +326,7 @@ class ConfigFile(SectionOrdered):
         Get the dimension of the configuration filed.
 
         Returns:
-            (int): The dimension according to the mandatory xmax parameter in the space section.
+            int: The dimension according to the mandatory xmax parameter in the space section.
             
         """
         x_max = self["space"]["xmax"]
@@ -344,7 +346,7 @@ class Variation:
         Create a Variation with the given parameters and values.
         
         Args:
-            *args (2-tuple of lists): Each argument must be a 2-tuple whose first elements is a list of str or int which
+            *args (2-:obj:`tuple` of :obj:`list`): Each argument must be a 2-tuple whose first elements is a list of str or int which
                                       identifies the parameter in its section and a list of the values the parameter
                                       will take.
         """
@@ -363,7 +365,7 @@ class Variation:
             config (ConfigFile): The configuration where the Variation will be applied.
 
         Returns:
-            (generator): A generator which provides the ConfigFile instances.
+            generator: A generator which provides the ConfigFile instances.
 
         """
         paths = [p[0] for p in self.parameters]
@@ -389,7 +391,7 @@ class Variation:
         This method might be useful to post-process the results if the parameter space is simple.
 
         Returns:
-            (list of tuples): A list with the values of the parameters in the cartesian product order.
+            :obj:`list` of `tuple`: A list with the values of the parameters in the cartesian product order.
 
         """
         values = [p[1] for p in self.parameters]

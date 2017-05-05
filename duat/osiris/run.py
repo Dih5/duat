@@ -14,11 +14,11 @@ import psutil
 
 # Path to osiris executables - guessed later in the code
 osiris_1d = ""
-"""Path to the osiris-1D.e file"""
+"""str: Path to the osiris-1D.e file"""
 osiris_2d = ""
-"""Path to the osiris-2D.e file"""
+"""str: Path to the osiris-2D.e file"""
 osiris_3d = ""
-"""Path to the osiris-3D.e file"""
+"""str: Path to the osiris-3D.e file"""
 
 
 def set_osiris_path(folder, warn=True):
@@ -113,7 +113,8 @@ class Run:
         """
         Find the current simulation step.
         
-        Returns: (int) The simulation step or -1 if it could not be found.
+        Returns:
+            int: The simulation step or -1 if it could not be found.
 
         """
         last_line = tail(path.join(self.run_dir, "out.txt"), 8)
@@ -171,7 +172,8 @@ class Run:
         The estimation uses a linear model and considers initialization negligible.
         The modification time of the os-stdin file is used in the calculation. If altered, estimation will be meaningless.
         
-        Returns: (float) The estimation of the time to end the simulation or NaN if no estimation could be done.
+        Returns: 
+            float: The estimation of the time to end the simulation or NaN if no estimation could be done.
 
         """
         if not self.is_running():  # Already finished
@@ -210,7 +212,7 @@ def open_run_list(base_path, filter=None):
         filter (str): Filter the directories using a UNIX-like pattern.
 
     Returns:
-        (list of `Run`): A list with the Run instances, ordered so their paths are in human order.
+        list of `Run`: A list with the Run instances, ordered so their paths are in human order.
 
     """
     dir_list = listdir(base_path)
@@ -241,7 +243,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
                      existing processes.
 
     Returns:
-        (tuple): A Run instance describing the execution.
+        tuple: A Run instance describing the execution.
 
     """
     candidates = _find_running_exe(path.join(run_dir, "osiris"))
@@ -301,13 +303,15 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
 def run_variation(config, variation, run_base, **kwargs):
     """
     Make consecutive calls to :func:`~duat.osiris.run.run_config` with ConfigFiles generated from a variation.
+    
     Args:
         config (`ConfigFile`): Base configuration file.
         variation (`Variation`): Description of the variations to apply.
         run_base (str): Path to the directory where the runs will take place, each in a folder named var_number.
         **kwargs: Keyword arguments to pass to :func:`~duat.osiris.run.run_config`
 
-    Returns: (list): List with the return values of each call.
+    Returns:
+        list: List with the return values of each call.
 
     """
     r_list = []

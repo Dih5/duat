@@ -25,7 +25,8 @@ def _is_latex(s):
     Args:
         s (str): The string to test.
 
-    Returns: (bool) True if it seems a LaTeX expression, False otherwise.
+    Returns:
+        bool: True if it seems a LaTeX expression, False otherwise.
 
     """
     if not s:  # Empty string is not LaTeX
@@ -44,18 +45,19 @@ class Diagnostic:
         dt (float): The time step between snapshots of a consecutive number.
         t_0 (float): The time of the first snapshot.
         time_units (str): The name of the unit of time.
-        file_list (`list` of `str`): List of h5 files, one per time snapshot.
-        snapshot_list (`list` of `int`): List of integers identifying the snapshots. Multiply by dt to get time.
-        keys (`list` of `str`): Names of the datasets in the Diagnostic, given in human order.
-        axes (`list` of `dict`): Info of each axis in the Diagnostic.
-        datasets_as_axis(`dict`): Info of datasets if treated as axes. WARNING: Only used with energy bins.
-        shape (`tuple`): A tuple with:
+        file_list (list of str): List of h5 files, one per time snapshot.
+        snapshot_list (list of int): List of integers identifying the snapshots. Multiply by dt to get time.
+        keys (list of str): Names of the datasets in the Diagnostic, given in human order.
+        axes (list of dict): Info of each axis in the Diagnostic.
+        datasets_as_axis(dict): Info of datasets if treated as axes. WARNING: Only used with energy bins.
+        shape (tuple): A tuple with:
 
-            * `list`: The number of grid dimensions.
-            * `int`: The number of datasets (excluding axes definition).
-            * `int`: The number of snapshots in time.
+            * list: The number of grid dimensions.
+            * int: The number of datasets (excluding axes definition).
+            * int: The number of snapshots in time.
             
-    Note: The axes list is provided in the order of the numpy convention for arrays. This is the opposite of order used
+    Note:
+        The axes list is provided in the order of the numpy convention for arrays. This is the opposite of order used
         to label the axes in the hdf5 files. For example in a 2d array the first axes will be the labeled as AXIS2, and
         the second will be AXIS1. Unless the user makes use of other external tools to read the data, he/she can safely
         ignore this note.
@@ -67,7 +69,10 @@ class Diagnostic:
         Create a Diagnostic instance.
 
         Args:
-            data_path: Path of the directory containing the diagnostic data.
+            data_path (str): Path of the directory containing the diagnostic data.
+        
+        Raises:
+            ValueError: If there is no data in `data_path`.
             
         """
         self.data_path = data_path
@@ -154,7 +159,7 @@ class Diagnostic:
         return axes
 
     def _clean_dataset_key(self, dataset_key):
-        """Return the given dataset key as str, using human order if int. Might raise error or warning."""
+        """Return the given dataset key as `str`, using human order if `int`. Might raise error or warning."""
         if isinstance(dataset_key, int):
             dataset_key = self.keys[dataset_key]
         elif isinstance(dataset_key, str):
@@ -195,7 +200,8 @@ class Diagnostic:
 
             time_selector (slice): A slice instance selecting the points in time to take.
 
-        Returns: (generator): A generator which provides the data.
+        Returns:
+            generator: A generator which provides the data.
 
         """
         multiple_datasets = False  # If a dataset list is going to be returned
@@ -264,7 +270,7 @@ class Diagnostic:
             axes_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
 
         Returns:
-            (list of dict) Ordered list of the axes left by the reduction.
+            list of dict: Ordered list of the axes left by the reduction.
             
         """
         axes = []
@@ -293,6 +299,7 @@ class Diagnostic:
             time_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method. 
 
         Returns:
+            :obj:`list` of :obj:`float`: The times resulting as a consequence of the slice.
 
         """
         if time_selector:
@@ -413,8 +420,8 @@ class Diagnostic:
         """
         Generate a colormap in an axis and the time.
     
-        This function plots a magnitude depending on ONE spatial coordinate (hence the name) and on time as a colormap in
-        the cartesian product of such a magnitude and the time.
+        This function plots a magnitude depending on ONE spatial coordinate (hence the name) and on time as a colormap
+        in the cartesian product of such a magnitude and the time.
     
         Args:
             output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
@@ -508,7 +515,7 @@ def get_diagnostic_list(run_dir="."):
         run_dir (str): The run directory.
 
     Returns:
-        (list of Diagnostic) List of the diagnostic found.
+        :obj:`list` of :obj:`Diagnostic`: List of the diagnostic found.
 
     """
     diagnostic_list = []
@@ -534,7 +541,7 @@ def auto_process(run_dir=".", file_format="mp4", output_dir=None, verbose=None, 
                            used.
 
     Returns:
-        (int) Number of files generated.
+        int: Number of files generated.
 
     """
     # TODO: Pass kwargs
