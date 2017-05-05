@@ -1,14 +1,14 @@
 # -*- coding: UTF-8 -*-
 """Run configuration files with OSIRIS."""
 
-
-from os import path, remove, walk
+from os import path, remove, walk, listdir
 from shutil import copyfile
 import subprocess
 from time import sleep, time
 import re
+from glob import glob
 
-from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size
+from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key
 
 import psutil
 
@@ -91,7 +91,7 @@ class Run:
                 self.process = None
             elif len(candidates) > 1:
                 logger.warning("More than one pid was found for the run.\n"
-                              "Multiple processes are not really handled by duat yet, do not trust what you see.")
+                               "Multiple processes are not really handled by duat yet, do not trust what you see.")
                 self.process = psutil.Process(candidates[0])
             else:
                 self.process = psutil.Process(candidates[0])
@@ -199,6 +199,31 @@ class Run:
             return True
         else:
             return False
+
+
+def open_run_list(base_path, filter=None):
+    """
+    Create a Run instance for each of the subdirectories in the given path.
+    
+    Args:
+        base_path (str): Path where the runs are found.
+        filter (str): Filter the directories using a UNIX-like pattern.
+
+    Returns:
+        (list of `Run`): A list with the Run instances, ordered so their paths are in human order.
+
+    """
+    dir_list = listdir(base_path)
+    if not dir_list:
+        return []
+    if filter is not None:
+        filter_list = glob(path.join(base_path, filter))
+        filter_list = [path.basename(x) for x in filter_list]
+        dir_list = [x for x in dir_list if x in filter_list]
+        if not dir_list:
+            return []
+    dir_list.sort(key=human_order_key)
+    return [Run(x) for x in [path.join(base_path, y) for y in dir_list]]
 
 
 def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, force=None):
@@ -309,4 +334,5 @@ if not (osiris_1d and osiris_2d and osiris_3d):
             logger.warning("Warning: osiris-2D.e not found.")
         if not osiris_3d:
             logger.warning("Warning: osiris-3D.e not found.")
-        logger.warning("Use the function set_osiris_path or set the variables run.osiris_1d and so to allow the run module to work.")
+        logger.warning(
+            "Use the function set_osiris_path or set the variables run.osiris_1d and so to allow the run module to work.")
