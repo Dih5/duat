@@ -232,7 +232,7 @@ class Species(SectionOrdered):
         self.set_section("species",
                          Section("species",
                                  {"num_par_max": 2048, "rqm": -1.0, "num_par_x": [2] * d, "vth": [0.0] * 3,
-                                        "vfl": [0.0] * 3}))
+                                  "vfl": [0.0] * 3}))
 
         default_profile = ifd(d, {"fx": [[1., 1., 1., 1., 1., 1.]],
                                   "x": [[0., 0.9999, 1.000, 2.000, 2.001, 10000.]]},
@@ -293,7 +293,7 @@ class ConfigFile(SectionOrdered):
         self["time_step"] = Section("time_step", {"dt": ifd(d, 0.07, 0.07, 0.05), "ndump": 10})
 
         self["space"] = Section("space", {"xmin": [0.0] * d, "xmax": ifd(d, [102.4], [3.2, 3.2], [1.0, 1.0, 1.0]),
-                                                "if_move": [False] * d})
+                                          "if_move": [False] * d})
 
         self["time"] = Section("time", {"tmin": 0.0, "tmax": 7.0})
 
@@ -306,7 +306,7 @@ class ConfigFile(SectionOrdered):
         for i in [1, 2]:
             self["species_list"].append_section(Species(d, i))
 
-        # self["pulse_sequence"] = ConfigSection("pulse_sequence", {"num_pulses": 0})
+            # self["pulse_sequence"] = ConfigSection("pulse_sequence", {"num_pulses": 0})
 
     def write(self, path):
         """
@@ -341,18 +341,24 @@ class Variation:
     combinations of values, i.e., the parameter space is given by the cartesian product.
     
     """
-    def __init__(self, *args):
+
+    def __init__(self, *args, epilog=None):
         """
         Create a Variation with the given parameters and values.
         
         Args:
-            *args (2-:obj:`tuple` of :obj:`list`): Each argument must be a 2-tuple whose first elements is a list of str or int which
-                                      identifies the parameter in its section and a list of the values the parameter
-                                      will take.
+            *args (2-:obj:`tuple` of :obj:`list`): Each argument must be a 2-tuple whose first elements is a list of str
+                               or int which identifies the parameter in its section and a list of the values the
+                               parameter will take. The list can be None to perform no action while passing the
+                               parameter to the epilog function (see below).
+            epilog (callable): A function of two arguments that will be called with the simulation and the list of
+                               parameters when a config is being generated. This can be used for advanced modification,
+                               for example, to set two parameters to a related value (like two species temperature).
         """
         self.parameters = args
-        self._par_names = [p[0][-1] for p in self.parameters]
+        self._par_names = [None if p[0] is None else p[0][-1] for p in self.parameters]
         self.len_list = [len(p[1]) for p in self.parameters]
+        self.epilog = epilog
 
     def __repr__(self):
         return "Variation<%s (%s)>" % (" x ".join(self._par_names), "x".join([str(x) for x in self.len_list]))
@@ -375,12 +381,15 @@ class Variation:
             for value in product(*values):  # Value is multidimensional in general
                 c = copy.deepcopy(config)
                 for i, path in enumerate(paths):  # For the i-th thing to change
-                    place = c  # Start from the root
-                    for level in path[:-1]:  # ... access the leaf...
-                        place = place[level]
-                    place.set_par(path[-1], value[i])  # ... changing its value
-
+                    if path:  # If path is not None (non dummy parameter)
+                        place = c  # Start from the root
+                        for level in path[:-1]:  # ... access the leaf...
+                            place = place[level]
+                        place.set_par(path[-1], value[i])  # ... changing its value
+                if self.epilog:
+                    self.epilog(c, value)
                 yield c
+
         return gen()
 
     def get_parameter_list(self):
@@ -396,8 +405,3 @@ class Variation:
         """
         values = [p[1] for p in self.parameters]
         return list(product(*values))
-
-
-
-
-
