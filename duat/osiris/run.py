@@ -8,7 +8,8 @@ from time import sleep, time
 import re
 from glob import glob
 
-from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key
+from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key, MPCaller, \
+    Call
 
 import psutil
 
@@ -73,6 +74,7 @@ class Run:
         
     """
 
+    # TODO: Update process information
     def __init__(self, run_dir):
         self.run_dir = run_dir
         # TODO: Handle exceptions
@@ -193,13 +195,17 @@ class Run:
     def has_error(self):
         """Search for common error messages in the output file."""
         # TODO: Cache result if reached execution with no error
-        with open(path.join(self.run_dir, "out.txt"), "r") as f:
-            text = f.read()
-        # TODO: Optimize this search
-        if "(*error*)" in text or re.search("Error reading .* parameters", text) or re.search("MPI_ABORT was invoked",
-                                                                                              text):
-            return True
-        else:
+        try:
+            with open(path.join(self.run_dir, "out.txt"), "r") as f:
+                text = f.read()
+            # TODO: Optimize this search
+            if "(*error*)" in text or re.search("Error reading .* parameters", text) or re.search(
+                    "MPI_ABORT was invoked",
+                    text):
+                return True
+            else:
+                return False
+        except FileNotFoundError:
             return False
 
 
@@ -228,7 +234,14 @@ def open_run_list(base_path, filter=None):
     return [Run(x) for x in [path.join(base_path, y) for y in dir_list]]
 
 
-def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, force=None):
+def _execute_run(prefix, osiris_path, run_dir):
+    """Execute and wait for a run to finish"""
+    # To be used with MPCaller
+    p = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
+    p.wait()
+
+
+def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, force=None, mpcaller=None):
     """
     Initiate a OSIRIS run from a config instance.
 
@@ -241,6 +254,8 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         force (str): Set what to do if a running executable is found in the directory. Set to "ignore" to launch anyway,
                      possibly resulting in multiple instances running simultaneously; set to "kill" to terminate the
                      existing processes.
+        mpcaller (MPCaller): An instance controlling multithreaded calls. If supplied, all calls will be handled by this
+                     instance and the blocking parameter will be ignored.
 
     Returns:
         tuple: A Run instance describing the execution.
@@ -282,25 +297,29 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
     elif prefix[-1] != " ":
         prefix += " "
 
-    proc = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
-    if blocking:
-        proc.wait()
-    else:  # Sleep a little to check for quickly appearing errors and to allow the shell to start osiris
-        sleep(0.2)
+    if mpcaller is not None:
+        mpcaller.add_call(Call(_execute_run, prefix, osiris_path, run_dir))
+        return Run(run_dir)
+    else:
+        proc = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
+        if blocking:
+            proc.wait()
+        else:  # Sleep a little to check for quickly appearing errors and to allow the shell to start osiris
+            sleep(0.2)
 
-    # BEWARE: Perhaps under extreme circumstances, OSIRIS might have not started despite sleeping.
-    # This could be solved reinstantiating RUN. Consider it a feature instead of a bug :P
+        # BEWARE: Perhaps under extreme circumstances, OSIRIS might have not started despite sleeping.
+        # This could be solved reinstantiating RUN. Consider it a feature instead of a bug :P
 
-    run = Run(run_dir)
+        run = Run(run_dir)
 
-    # Try to detect errors checking the output
-    if run.has_error():
-        logger.warning(
-            "Error detected while launching %s.\nCheck out.txt there for more information or re-run in console." % run_dir)
-    return run
+        # Try to detect errors checking the output
+        if run.has_error():
+            logger.warning(
+                "Error detected while launching %s.\nCheck out.txt there for more information or re-run in console." % run_dir)
+        return run
 
 
-def run_variation(config, variation, run_base, **kwargs):
+def run_variation(config, variation, run_base, queue_size=None, **kwargs):
     """
     Make consecutive calls to :func:`~duat.osiris.run.run_config` with ConfigFiles generated from a variation.
     
@@ -315,9 +334,16 @@ def run_variation(config, variation, run_base, **kwargs):
 
     """
     r_list = []
-    for i, c in enumerate(variation.get_generator(config)):
-        r = run_config(c, path.join(run_base, "var_" + str(i)), **kwargs)
-        r_list.append(r)
+
+    if not queue_size:
+        for i, c in enumerate(variation.get_generator(config)):
+            r = run_config(c, path.join(run_base, "var_" + str(i)), **kwargs)
+            r_list.append(r)
+    else:
+        caller = MPCaller(queue_size)
+        for i, c in enumerate(variation.get_generator(config)):
+            r = run_config(c, path.join(run_base, "var_" + str(i)), mpcaller=caller, **kwargs)
+            r_list.append(r)
     return r_list
 
 
