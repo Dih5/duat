@@ -34,6 +34,16 @@ def _is_latex(s):
     return re.match("^.(_.)?$", s) or "\\" in s  # If in the form x, x_i, or if there is a backlash (command)
 
 
+def _improve_latex(s):
+    """Improve an OSIRIS-generated latex string using common rules."""
+    # Descriptive subindexes in roman
+    s2 = s.replace(r"\omega_p", r"\omega_{\mathrm{p}}")
+    s2 = s2.replace("m_e", r"m_{\mathrm{e}}")
+    # "Arbitrary units" in roman
+    s2 = s2.replace("a.u.", r"\mathrm{a.u.}")
+    return s2
+
+
 class Diagnostic:
     """
     A OSIRIS diagnostic.
@@ -350,14 +360,14 @@ class Diagnostic:
             y_units = f[self.keys[0]].attrs["UNITS"][0].decode('UTF-8')
         if latex_label:
             if x_units:
-                x_units = "$" + x_units + "$"
+                x_units = "$" + _improve_latex(x_units) + "$"
             if y_units:
-                y_units = "$" + y_units + "$"
+                y_units = "$" + _improve_latex(y_units) + "$"
             # Names might be text or LaTeX. Try to guess
             if _is_latex(x_name):
-                x_name = "$" + x_name + "$"
+                x_name = "$" + _improve_latex(x_name) + "$"
             if _is_latex(y_name):
-                y_name = "$" + y_name + "$"
+                y_name = "$" + _improve_latex(y_name) + "$"
 
         if x_units:
             ax.set_xlabel("%s (%s)" % (x_name, x_units))
@@ -458,18 +468,18 @@ class Diagnostic:
 
         if latex_label:
             if x_units:
-                x_units = "$" + x_units + "$"
+                x_units = "$" + _improve_latex(x_units) + "$"
             if y_units:
-                y_units = "$" + y_units + "$"
+                y_units = "$" + _improve_latex(y_units) + "$"
             if title_units:
-                title_units = "$" + title_units + "$"
+                title_units = "$" + _improve_latex(title_units) + "$"
             # Names might be text or LaTeX. Try to guess
             if _is_latex(x_name):
-                x_name = "$" + x_name + "$"
+                x_name = "$" + _improve_latex(x_name) + "$"
             if _is_latex(y_name):
-                y_name = "$" + y_name + "$"
+                y_name = "$" + _improve_latex(y_name) + "$"
             if _is_latex(title_name):
-                title_name = "$" + title_name + "$"
+                title_name = "$" + _improve_latex(title_name) + "$"
 
         if x_units:
             ax.set_xlabel("%s (%s)" % (x_name, x_units))
