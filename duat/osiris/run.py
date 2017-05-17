@@ -295,6 +295,8 @@ def _execute_run(prefix, osiris_path, run_dir, run_object=None):
     # Cf. run_config
     p = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
     if run_object is not None:
+        # TODO: The run_object updates in the process created by MPCaller, where it is useless.
+        # Probably it is not worth sharing the object. User may call the Run.update method if interested.
         sleep(0.2)
         run_object.update()
     p.wait()
