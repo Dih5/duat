@@ -290,10 +290,14 @@ def open_run_list(base_path, filter=None):
     return [Run(x) for x in [path.join(base_path, y) for y in dir_list]]
 
 
-def _execute_run(prefix, osiris_path, run_dir):
-    """Execute and wait for a run to finish"""
-    # To be used with MPCaller
+def _execute_run(prefix, osiris_path, run_dir, run_object=None):
+    """Execute and wait for a run to finish, optionally updating a Run instance when the call is made."""
+    # Cf. run_config
     p = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
+    if run_object is not None:
+        sleep(0.2)
+        print("Updating")
+        run_object.update()
     p.wait()
 
 
@@ -354,8 +358,10 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         prefix += " "
 
     if mpcaller is not None:
-        mpcaller.add_call(Call(_execute_run, prefix, osiris_path, run_dir))
-        return Run(run_dir)
+        run = Run(run_dir)
+        # Set the run instance to update the process info when the call is made.
+        mpcaller.add_call(Call(_execute_run, prefix, osiris_path, run_dir, run_object=run))
+        return run
     else:
         proc = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
         if blocking:
