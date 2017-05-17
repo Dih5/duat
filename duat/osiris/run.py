@@ -219,11 +219,11 @@ class Run:
             float: The estimation of the time to end the simulation or NaN if no estimation could be done.
 
         """
-        if not self.is_running():  # Already finished
-            return 0
+        if not self.is_running():
+            return 0 if self.is_finished() else float("nan")
         else:
             current = self.current_step()
-            if current <= 0:  # If not started or error
+            if current <= 0:  # If not dumped yet or error
                 return float('nan')
             else:
                 elapsed = time() - path.getmtime(path.join(self.run_dir, "os-stdin"))
