@@ -319,7 +319,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         return run
 
 
-def run_variation(config, variation, run_base, queue_size=None, **kwargs):
+def run_variation(config, variation, run_base, caller=None, **kwargs):
     """
     Make consecutive calls to :func:`~duat.osiris.run.run_config` with ConfigFiles generated from a variation.
     
@@ -327,6 +327,9 @@ def run_variation(config, variation, run_base, queue_size=None, **kwargs):
         config (`ConfigFile`): Base configuration file.
         variation (`Variation`): Description of the variations to apply.
         run_base (str): Path to the directory where the runs will take place, each in a folder named var_number.
+        caller (int or `MPCaller`): If supplied, the calls will be managed by a MPCaller instance. If an int is provided
+                                    an MPCaller with such a number of threads will be created. Provide an instance if
+                                    interested in further controlling.
         **kwargs: Keyword arguments to pass to :func:`~duat.osiris.run.run_config`
 
     Returns:
@@ -335,14 +338,19 @@ def run_variation(config, variation, run_base, queue_size=None, **kwargs):
     """
     r_list = []
 
-    if not queue_size:
+    if caller is None:
         for i, c in enumerate(variation.get_generator(config)):
             r = run_config(c, path.join(run_base, "var_" + str(i)), **kwargs)
             r_list.append(r)
     else:
-        caller = MPCaller(queue_size)
+        if isinstance(caller, int):
+            _caller = MPCaller(caller)
+        else:
+            # Otherwise assume it was a MPCaller instance
+            _caller = caller
+
         for i, c in enumerate(variation.get_generator(config)):
-            r = run_config(c, path.join(run_base, "var_" + str(i)), mpcaller=caller, **kwargs)
+            r = run_config(c, path.join(run_base, "var_" + str(i)), mpcaller=_caller, **kwargs)
             r_list.append(r)
     return r_list
 

@@ -137,15 +137,25 @@ def _caller(q):
 
 
 class MPCaller:
-    """MultiProcessing Caller. Makes calls using multiple subprocesses."""
+    """
+    MultiProcessing Caller. Makes calls using multiple subprocesses.
+    
+    Attributes:
+        processes (list of multiprocessing.Process): Processes managed by the instance.
+        num_threads (int): Number of processes the instance expects to manage.
+    """
 
     def __init__(self, num_threads=2):
         self.q = Queue()
         self.processes = []
+        self.num_threads = num_threads
         self.spawn_threads(num_threads)
 
     def spawn_threads(self, num_threads):
-        """Create the required number of threads"""
+        """Create the required number of threads.
+        
+        This might be used to increase the number of threads set on creation.
+        """
         for _ in range(num_threads):
             t = Process(target=_caller, args=(self.q,))
             t.daemon = True
@@ -153,20 +163,21 @@ class MPCaller:
             self.processes.append(t)
 
     def add_call(self, call):
-        """Add a call to its stack"""
+        """Add a call to the instance's stack."""
         self.q.put(call)
 
     def wait_calls(self):
-        """Ask all processes to consume the queue and end.
-
-        After this method is called no threads will remain. Create another instance or call spawn_threads if needed.
+        """
+        Ask all processes to consume the queue and end.
         
+        This will make the instance recover the number of threads it had on creation.
         """
         for _ in range(len(self.processes)):
             self.q.put("END")
         for t in self.processes:
             t.join()
         self.processes = []
+        self.spawn_threads(self.num_threads)
 
 
 def tail(path, lines=1, _step=4098):
