@@ -115,7 +115,7 @@ def daemonize(func):
 
 
 class Call:
-    """Objectization of a call to be made"""
+    """Objectization of a call to be made. When an instance is called, such a call will be made."""
 
     def __init__(self, fn, *args, **kwargs):
         self.fn = fn
@@ -142,7 +142,8 @@ class MPCaller:
     
     Attributes:
         processes (list of multiprocessing.Process): Processes managed by the instance.
-        num_threads (int): Number of processes the instance expects to manage.
+        num_threads (int): Number of processes the instance manages (if no :func:`spawn_threads` call is made).
+        
     """
 
     def __init__(self, num_threads=2):
@@ -152,9 +153,10 @@ class MPCaller:
         self.spawn_threads(num_threads)
 
     def spawn_threads(self, num_threads):
-        """Create the required number of threads.
+        """Create the required number of processes and add them to the caller.
         
-        This might be used to increase the number of threads set on creation.
+        This does not remove previously created processes.
+        
         """
         for _ in range(num_threads):
             t = Process(target=_caller, args=(self.q,))
@@ -163,14 +165,25 @@ class MPCaller:
             self.processes.append(t)
 
     def add_call(self, call):
-        """Add a call to the instance's stack."""
+        """
+        Add a call to the instance's stack.
+        
+        Args:
+            call (Callable): A function whose call method will be invoked by the processes. Consider using lambda
+                             functions or a :class:`Call` instance.
+
+        """
         self.q.put(call)
 
     def wait_calls(self, blocking=True, respawn=False):
         """
-        Ask all processes to consume the queue and end.
+        Ask all processes to consume the queue and stop.
         
-        This will make the instance recover the number of threads it had on creation.
+        Args:
+            blocking (bool): Whether to block the call, waiting for processes termination.
+            respawn (bool): If blocking is True, this indicates whether to respawn the number of threads created at
+                            initialization. Otherwise ignored (no automatic respawn if non-blocking).
+
         """
         for _ in range(len(self.processes)):
             self.q.put("END")
