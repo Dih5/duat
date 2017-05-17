@@ -408,6 +408,11 @@ def run_variation(config, variation, run_base, caller=None, **kwargs):
         for i, c in enumerate(variation.get_generator(config)):
             r = run_config(c, path.join(run_base, "var_" + str(i)), mpcaller=_caller, **kwargs)
             r_list.append(r)
+
+        if isinstance(caller, int):
+            # If the MPCaller was created in this method, threads should die after execution
+            _caller.wait_calls(blocking=False)
+            # Nevertheless, processes seems not to be discarded until a new call to this method is made
     return r_list
 
 

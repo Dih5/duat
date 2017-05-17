@@ -166,7 +166,7 @@ class MPCaller:
         """Add a call to the instance's stack."""
         self.q.put(call)
 
-    def wait_calls(self):
+    def wait_calls(self, blocking=True, respawn=False):
         """
         Ask all processes to consume the queue and end.
         
@@ -174,10 +174,13 @@ class MPCaller:
         """
         for _ in range(len(self.processes)):
             self.q.put("END")
-        for t in self.processes:
-            t.join()
-        self.processes = []
-        self.spawn_threads(self.num_threads)
+
+        if blocking:
+            for t in self.processes:
+                t.join()
+            self.processes = []
+            if respawn:
+                self.spawn_threads(self.num_threads)
 
 
 def tail(path, lines=1, _step=4098):
@@ -215,6 +218,6 @@ def tail(path, lines=1, _step=4098):
 
     return lines_found[-lines:]
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.Logger("duat")
-
