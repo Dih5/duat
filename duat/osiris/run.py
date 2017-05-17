@@ -296,7 +296,6 @@ def _execute_run(prefix, osiris_path, run_dir, run_object=None):
     p = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
     if run_object is not None:
         sleep(0.2)
-        print("Updating")
         run_object.update()
     p.wait()
 
