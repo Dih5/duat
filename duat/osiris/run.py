@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 """Run configuration files with OSIRIS."""
 
-from os import path, remove, walk, listdir
+from os import path, remove, walk, listdir, environ
 from shutil import copyfile
 import subprocess
 from time import sleep, time
@@ -423,8 +423,13 @@ def run_variation(config, variation, run_base, caller=None, **kwargs):
 
 
 # Try to guess the OSIRIS location:
-for t in [path.join(path.expanduser("~"), "osiris", "bin"),
-          path.join("usr", "local", "osiris", "bin")]:
+_candidates = []
+if "OSIRIS_PATH" in environ:
+    _candidates.append(environ["OSIRIS_PATH"])
+_candidates.append(path.join(path.expanduser("~"), "osiris", "bin"))
+_candidates.append(path.join("usr", "local", "osiris", "bin"))
+
+for t in _candidates:
     set_osiris_path(t, warn=False)
     if osiris_1d and osiris_2d and osiris_3d:
         break
@@ -439,5 +444,7 @@ if not (osiris_1d and osiris_2d and osiris_3d):
             logger.warning("Warning: osiris-2D.e not found.")
         if not osiris_3d:
             logger.warning("Warning: osiris-3D.e not found.")
-        logger.warning(
-            "Use the function set_osiris_path or set the variables run.osiris_1d and so to allow the run module to work.")
+
+    logger.warning("Set the environment variable OSIRIS_PATH to a folder where the OSIRIS executables with names "
+                   "osiris-1D.e and so on are found.\n"
+                   "You can also use run.set_osiris_path or set the variables run.osiris_1d (and so on).")
