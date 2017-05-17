@@ -67,25 +67,62 @@ class Run:
     Attributes:
         run_dir (str): Directory where the run takes place.
         total_steps (int): Amount of time steps in the simulation.
-        process (psutil.Process): Representation of the process running the simulation.
+        process (psutil.Process): Representation of the process running the simulation. If no process is found it will
+                                  be None. Only in that case, methods that update the state of simulation will check if
+                                  a process has spawned when called.
         
     Notes:
-        Only single-process runs are supported at the moment.
+        Only single-process runs are supported at the moment. Resuming runs are neither supported yet.
         
     """
 
-    # TODO: Update process information
     def __init__(self, run_dir):
+        """
+        Create a Run instance.
+        
+        Args:
+            run_dir (str): Path where the OSIRIS run takes place. An os-stdin file must exist there.
+             
+        Raises:
+            ValueError: If no os-stdin is found.
+            
+        """
         self.run_dir = run_dir
-        # TODO: Handle exceptions
-        with open(path.join(run_dir, "os-stdin"), "r") as f:
-            text = f.read()
-        dt = float(re.match(r".*time_step(.*?){(.*?)dt(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE).group(4))
-        tmin = float(re.match(r".*time(.*?){(.*?)tmin(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE).group(4))
-        tmax = float(re.match(r".*time(.*?){(.*?)tmax(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE).group(4))
+        try:
+            with open(path.join(run_dir, "os-stdin"), "r") as f:
+                text = f.read()
+            r = re.match(r".*time_step(.*?){(.*?)dt(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
+            if not r:
+                raise ValueError("No dt found in os-stdin.")
+            dt = float(r.group(4))
+            r = re.match(r".*time(.*?){(.*?)tmin(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
+            t_min = float(r.group(4)) if r else 0.0
+            r = re.match(r".*time(.*?){(.*?)tmax(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
+            if not r:
+                raise ValueError("No tmax found in os-stdin. Default value 0.0 is trivial.")
+            t_max = float(r.group(4))
 
-        self.total_steps = int((tmax - tmin) // dt) + 1
+            self.total_steps = int((t_max - t_min) // dt) + 1
+        except FileNotFoundError:
+            raise ValueError("No os-stdin file in %s" % run_dir)
 
+        self.update()
+
+    def __repr__(self):
+        if self.is_running():
+            return "Run<%s (%s/%d)>" % (self.run_dir, self.current_step(), self.total_steps)
+        elif self.has_error():
+            # The run started but failed
+            return "Run<%s [FAILED]>" % (self.run_dir,)
+        elif self.is_finished():
+            # The run was finished
+            return "Run<%s> [FINISHED]" % (self.run_dir,)
+        else:
+            # No process was detected. Perhaps it is set to start later, but this should remain unkown for the object
+            return "Run<%s> [NOT STARTED]" % (self.run_dir,)
+
+    def update(self):
+        """Update the process info using what is found at the moment."""
         candidates = _find_running_exe(path.join(self.run_dir, "osiris"))
 
         try:
@@ -100,16 +137,6 @@ class Run:
         except psutil.NoSuchProcess:
             # If the process have died before processing was completed.
             self.process = None
-
-    def __repr__(self):
-        if self.is_running():  # Process has not finished yet
-            return "Run<%s (%s/%d)>" % (self.run_dir, self.current_step(), self.total_steps)
-        else:
-            # Badly configured runs also return 0, so do not display the useless return code
-            if self.has_error():
-                return "Run<%s [FAILED]>" % (self.run_dir,)
-            else:
-                return "Run<%s>" % (self.run_dir,)
 
     def current_step(self):
         """
@@ -132,8 +159,22 @@ class Run:
     def is_running(self):
         """Return True if the simulation is known to be running, or False otherwise."""
         if self.process is None:
-            return False
+            # Try to find a process only if none was found when the instance was created
+            self.update()
+            if self.process is None:
+                return False
+            else:
+                return self.process.is_running()
         return self.process.is_running()
+
+    def is_finished(self):
+        if self.is_running():
+            return False
+        else:
+            if path.isfile(path.join(self.run_dir, "TIMINGS", "timings.001")):
+                return True
+            else:
+                return False
 
     def terminate(self):
         """Terminate the OSIRIS process (if running)."""
@@ -187,6 +228,21 @@ class Run:
             else:
                 elapsed = time() - path.getmtime(path.join(self.run_dir, "os-stdin"))
                 return elapsed * (self.total_steps / current - 1)
+
+    def real_time(self):
+        """Find the total time in seconds taken by the simulation if it has finished, otherwise returning nan."""
+        try:
+            # TODO: Update for resuming runs
+            with open(path.join(self.run_dir, "TIMINGS", "timings.001"), "r") as f:
+                text = f.read()
+            r = re.match(r" Total time for loop was(?: *)(.*?)(?: *)seconds", text, re.DOTALL + re.MULTILINE)
+            if not r:
+                logger.warning("Bad format in timings file. The real time could not be read.")
+                return float("nan")
+            else:
+                return float(r.group(1))
+        except FileNotFoundError:
+            return float("nan")
 
     def get_size(self):
         """Get the size of all run data in bytes."""
