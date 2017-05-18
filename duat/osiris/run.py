@@ -88,6 +88,7 @@ class Run:
             
         """
         self.run_dir = run_dir
+        self._run_dir_name = path.basename(run_dir)
         try:
             with open(path.join(run_dir, "os-stdin"), "r") as f:
                 text = f.read()
@@ -110,16 +111,19 @@ class Run:
 
     def __repr__(self):
         if self.is_running():
-            return "Run<%s (%s/%d)>" % (self.run_dir, self.current_step(), self.total_steps)
+            return "Run<%s [RUNNING (%s/%d)]>" % (self._run_dir_name, self.current_step(), self.total_steps)
         elif self.has_error():
             # The run started but failed
-            return "Run<%s [FAILED]>" % (self.run_dir,)
+            return "Run<%s [FAILED]>" % (self._run_dir_name,)
         elif self.is_finished():
             # The run was finished
-            return "Run<%s> [FINISHED]" % (self.run_dir,)
+            return "Run<%s> [FINISHED]" % (self._run_dir_name,)
+        elif self.current_step() >= 0:
+            # The run started at some point but was not completed
+            return "Run<%s> [INCOMPLETE (%s/%d)]" % (self._run_dir_name, self.current_step(), self.total_steps)
         else:
-            # No process was detected. Perhaps it is set to start later, but this should remain unkown for the object
-            return "Run<%s> [NOT STARTED]" % (self.run_dir,)
+            # The run did not start
+            return "Run<%s> [NOT STARTED]" % (self._run_dir_name,)
 
     def update(self):
         """Update the process info using what is found at the moment."""
