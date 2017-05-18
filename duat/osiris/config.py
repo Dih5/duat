@@ -356,9 +356,11 @@ class Variation:
                                for example, to set two parameters to a related value (like two species temperature).
         """
         self.parameters = args
-        self._par_names = [None if p[0] is None else p[0][-1] for p in self.parameters]
+        self._par_names = ["[dummy]" if p[0] is None else p[0][-1] for p in self.parameters]
         self.len_list = [len(p[1]) for p in self.parameters]
         self.epilog = epilog
+        if epilog is None and all(p[0] is None for p in self.parameters):
+            logger.warning("Trivial Variation generated. Did you forget an epilog?")
 
     def __repr__(self):
         return "Variation<%s (%s)>" % (" x ".join(self._par_names), "x".join([str(x) for x in self.len_list]))
