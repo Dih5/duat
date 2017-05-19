@@ -10,6 +10,7 @@ from glob import glob
 
 from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key, MPCaller, \
     Call
+from .plot import get_diagnostic_list as _get_diagnostic_list
 
 import psutil
 
@@ -267,6 +268,16 @@ class Run:
                 return False
         except FileNotFoundError:
             return False
+
+    def get_diagnostic_list(self):
+        """
+        Create a list with the diagnostic found in the given Run.
+
+        Returns:
+            :obj:`list` of :obj:`Diagnostic`: List of the diagnostic found.
+
+        """
+        return _get_diagnostic_list(self.run_dir)
 
 
 def open_run_list(base_path, filter=None):
