@@ -426,15 +426,20 @@ class Diagnostic:
         plt.close()
 
     def time_1d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
-                         dpi=200, latex_label=True, cmap=None, log_map=False):
+                         dpi=200, latex_label=True, cmap=None, log_map=False, show=True):
         """
         Generate a colormap in an axis and the time.
     
         This function plots a magnitude depending on ONE spatial coordinate (hence the name) and on time as a colormap
         in the cartesian product of such a magnitude and the time.
+        
+        Note:
+            For simple manipulation like labels or title you can make use of the returned tuple or a
+            `matplotlib.pyplot.style.context`. More advanced manipulation can be done extracting the data with the
+            :func:`~duat.osiris.plot.Diagnostic.get_generator` method instead.
     
         Args:
-            output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
+            output_path (str): The place where the plot is saved. If "" or None, the figure is not saved.
             dataset_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
             axes_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
             time_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
@@ -442,6 +447,10 @@ class Diagnostic:
             latex_label (bool): Whether for use LaTeX code for the plot.
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
             log_map (bool): Whether the map is plot in log scale.
+            show (bool): Whether to show the plot. This is blocking if matplotlib is in non-interactive mode.
+            
+        Returns:
+            (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`): Objects representing the generated plot.
     
         """
         if output_path:
@@ -509,12 +518,15 @@ class Diagnostic:
 
         fig.colorbar(contour_plot)
 
-        if not output_path:  # "" or None
-            plt.show()
-        else:
+        if output_path:  # "" or None
             plt.savefig(output_path, dpi=dpi)
 
-        plt.close()
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+        return fig, ax
 
 
 def get_diagnostic_list(run_dir="."):
