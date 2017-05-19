@@ -320,23 +320,37 @@ class Diagnostic:
 
     def time_1d_animation(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
                           dpi=200, fps=1, scale_mode="expand",
-                          latex_label=True):
+                          latex_label=True, interval=200):
         """
         Generate a plot of 1d data animated in time.
+        
+        If an output path with a suitable extension is supplied, the method will export it. Available formats are mp4
+        and gif. The returned objects allow for minimal customization and representation. For example in Jupyter you
+        might use `IPython.display.HTML(animation.to_html5_video())`, where `animation` is the returned `FuncAnimation`
+        instance.
+        
+        Note:
+            Exporting a high resolution animated gif with many frames might eat your RAM.
 
         Args:
             output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
             dataset_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
             axes_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
             time_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
-            dpi (int): The resolution of the frames in dots per inch.
-            fps (int): The frames per seconds.
-            scale_mode (str): How the scale is changed thorough time. Available methods are:
+            interval (float): Delay between frames in ms. If exporting to mp4, the fps is used instead to generate the
+                              file, although the returned objects do use this value.
+            dpi (int): The resolution of the frames in dots per inch (only if exporting).
+            fps (int): The frames per seconds (only if exporting to mp4).
+            scale_mode (str): How the scale is changed through time. Available methods are:
 
                 * "expand": The y limits increase when needed, but they don't decrease.
                 * "adjust_always": Always change the y limits to those of the data.
 
             latex_label (bool): Whether for use LaTeX code for the plot.
+            
+        Returns:
+            (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`, `matplotlib.animation.FuncAnimation`):
+            Objects representing the generated plot and its animation.
 
         """
         if output_path:
@@ -391,7 +405,7 @@ class Diagnostic:
             try:
                 new_dataset = next(gen)
             except StopIteration:
-                logger.warning("Warning: Tried to add a frame but all data was used")
+                logger.warning("Tried to add a frame to the animation, but all data was used.")
                 return
             label = 't = {0}'.format(time_list[i])
             plot_data.set_ydata(new_dataset[:])
@@ -406,24 +420,34 @@ class Diagnostic:
                 ax.set_ylim(min(new_dataset), max(new_dataset))
             return plot_data, ax
 
+        anim = FuncAnimation(fig, update, frames=range(1, len(time_list) - 2), interval=interval)
+
         if not output_path:  # "" or None
-            # FIXME: Plot in matplotlib window seems not to be working now.
-            FuncAnimation(fig, update, frames=np.arange(1, len(time_list) - 1), interval=1)
-            plt.show()
-        elif output_path.split(".")[-1].lower() == "gif":
-            anim = FuncAnimation(fig, update, frames=np.arange(1, len(time_list) - 1), interval=200)
-            anim.save(output_path, dpi=dpi, writer='imagemagick')
+            pass
         else:
-            metadata = dict(title=os.path.split(self.data_path)[-1], artist='duat', comment=self.data_path)
-            writer = FFMpegWriter(fps=fps, metadata=metadata)
-            with writer.saving(fig, output_path, dpi):
-                # Iterate over frames
-                for i in np.arange(1, len(time_list)):
-                    update(i)
+            filename = os.path.basename(output_path)
+            if "." in filename:
+                extension = output_path.split(".")[-1].lower()
+            else:
+                extension = None
+            if extension == "gif":
+                anim.save(output_path, dpi=dpi, writer='imagemagick')
+            elif extension == "mp4":
+                metadata = dict(title=os.path.split(self.data_path)[-1], artist='duat', comment=self.data_path)
+                writer = FFMpegWriter(fps=fps, metadata=metadata)
+                with writer.saving(fig, output_path, dpi):
+                    # Iterate over frames
+                    for i in range(1, len(time_list) - 1):
+                        update(i)
+                        writer.grab_frame()
+                    # Keep showing the last frame for the fixed time
                     writer.grab_frame()
-                # Keep showing the last frame for the fixed time
-                writer.grab_frame()
+            else:
+                logger.warning("Unknown extension in path %s. No output produced." % output_path)
+
         plt.close()
+
+        return fig, ax, anim
 
     def time_1d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
                          dpi=200, latex_label=True, cmap=None, log_map=False, show=True):
@@ -547,5 +571,3 @@ def get_diagnostic_list(run_dir="."):
         if not dirs and files:  # Terminal directory with files in it
             diagnostic_list.append(Diagnostic(root))
     return diagnostic_list
-
-
