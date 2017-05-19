@@ -11,8 +11,10 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   config.rst
+   run.rst
+   plot.rst
    common.rst
-   osiris.rst
 
 
 

@@ -7,7 +7,7 @@ TestOsirisConfig.py: Tests for the `osiris.config` module.
 
 import unittest
 
-from duat.osiris.config import *
+from duat.config import *
 
 
 class TestOsirisConfig(unittest.TestCase):

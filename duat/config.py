@@ -6,7 +6,7 @@ from itertools import product
 
 import numpy as np
 
-from ..common import ifd, logger
+from duat.common import ifd, logger
 
 
 def val_to_fortran(val):

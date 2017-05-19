@@ -1,8 +1,8 @@
-:mod:`osiris.config`
-====================
+:mod:`duat.config`
+==================
 
 
-.. automodule:: duat.osiris.config
+.. automodule:: duat.config
    :special-members:
    :exclude-members: __dict__, __weakref__
    :members:

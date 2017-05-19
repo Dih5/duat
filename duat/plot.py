@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib import ticker
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
-from ..common import ensure_dir_exists, human_order_key, MPCaller, Call, logger
+from duat.common import ensure_dir_exists, human_order_key, MPCaller, Call, logger
 
 
 def _is_latex(s):

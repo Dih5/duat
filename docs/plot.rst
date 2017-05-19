@@ -1,8 +1,8 @@
-:mod:`osiris.run`
-=================
+:mod:`duat.plot`
+================
 
 
-.. automodule:: duat.osiris.run
+.. automodule:: duat.plot
    :special-members:
    :exclude-members: __dict__, __weakref__
    :members:

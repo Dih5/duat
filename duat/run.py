@@ -1,18 +1,18 @@
 # -*- coding: UTF-8 -*-
 """Run configuration files with OSIRIS."""
 
+import re
+import subprocess
+from glob import glob
 from os import path, remove, walk, listdir, environ
 from shutil import copyfile
-import subprocess
 from time import sleep, time
-import re
-from glob import glob
-
-from ..common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key, MPCaller, \
-    Call
-from .plot import get_diagnostic_list as _get_diagnostic_list
 
 import psutil
+
+from duat.plot import get_diagnostic_list as _get_diagnostic_list
+from duat.common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key, MPCaller, \
+    Call
 
 # Path to osiris executables - guessed later in the code
 osiris_1d = ""
