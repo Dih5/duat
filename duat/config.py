@@ -232,7 +232,7 @@ class SectionOrdered(MetaSection):
 
     def set_section(self, name, section=None):
         """ Add or replace a section."""
-        if not section:  # No section was given
+        if section is None:  # No section was given
             section = Section(name) if "_list" not in name else SectionList(label=name)
         if isinstance(section, str):  # A string was given (abuse of notation)
             section = Section(section) if "_list" not in name else SectionList(label=section)
@@ -265,58 +265,89 @@ class Species(SectionOrdered):
     order = ["species", "profile", "spe_bound", "diag_species"]
     types = {"species": Section, "profile": Section, "spe_bound": Section, "diag_species": Section}
 
-    def __init__(self, d, num=None):
-        label = "Configuration for species " + str(num) if num else ""
+    def __init__(self, label=None, dim=None):
+        if isinstance(label, int):
+            label = "Configuration for species " + str(label)
         SectionOrdered.__init__(self, label=label, order=Species.order, fixed=True, types=Species.types)
 
-        self.set_section("species",
-                         Section("species",
-                                 {"num_par_max": 2048, "rqm": -1.0, "num_par_x": [2] * d, "vth": [0.0] * 3,
-                                  "vfl": [0.0] * 3}))
+        # TODO: Move initialization to ConfigFileClass
+        if dim is not None:
+            self.set_section("species",
+                             Section("species",
+                                     {"num_par_max": 2048, "rqm": -1.0, "num_par_x": [2] * dim, "vth": [0.0] * 3,
+                                      "vfl": [0.0] * 3}))
 
-        default_profile = ifd(d, {"fx": [[1., 1., 1., 1., 1., 1.]],
-                                  "x": [[0., 0.9999, 1.000, 2.000, 2.001, 10000.]]},
-                              # 2d
-                              {"fx": [[1., 1., 1., 1., 1., 1.], [1., 1., 1., 1., 1., 1.]],
-                               "x": [[0., 0.9999, 1.000, 2.000, 2.001, 10000.],
-                                     [0., 0.9999, 1.000, 2.000, 2.001, 10000.]]},
-                              # 3d
-                              {"fx": [[1., 1., 1., 1., 1., 1.], [1., 1., 1., 1., 1., 1.],
-                                      [1., 1., 1., 1., 1., 1.]],
-                               "x": [[0., 0.9999, 1.000, 2.000, 2.001, 10000.],
-                                     [0., 0.9999, 1.000, 2.000, 2.001, 10000.],
-                                     [0., 0.9999, 1.000, 2.000, 2.001, 10000.]]}
-                              )
-        self.set_section("profile", Section("profile", default_profile))
+            default_profile = ifd(dim, {"fx": [[1., 1., 1., 1., 1., 1.]],
+                                        "x": [[0., 0.9999, 1.000, 2.000, 2.001, 10000.]]},
+                                  # 2d
+                                  {"fx": [[1., 1., 1., 1., 1., 1.], [1., 1., 1., 1., 1., 1.]],
+                                   "x": [[0., 0.9999, 1.000, 2.000, 2.001, 10000.],
+                                         [0., 0.9999, 1.000, 2.000, 2.001, 10000.]]},
+                                  # 3d
+                                  {"fx": [[1., 1., 1., 1., 1., 1.], [1., 1., 1., 1., 1., 1.],
+                                          [1., 1., 1., 1., 1., 1.]],
+                                   "x": [[0., 0.9999, 1.000, 2.000, 2.001, 10000.],
+                                         [0., 0.9999, 1.000, 2.000, 2.001, 10000.],
+                                         [0., 0.9999, 1.000, 2.000, 2.001, 10000.]]}
+                                  )
+            self.set_section("profile", Section("profile", default_profile))
 
-        self.set_section("spe_bound",
-                         Section("spe_bound",
-                                 {"type": ifd(d, [[0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0], [0, 0]])}))
+            self.set_section("spe_bound",
+                             Section("spe_bound",
+                                     {"type": ifd(dim, [[0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0], [0, 0]])}))
 
-        self.set_section("diag_species", Section("diag_species"))
+            self.set_section("diag_species", Section("diag_species"))
+
+
+class Cathode(SectionOrdered):
+    """Set of sections defining a cathode."""
+
+    # Keep the default order as a class variable, but copy to the instance to allow modification
+    order = ["cathode", "species", "spe_bound", "diag_species"]
+    types = {"cathode": Section, "species": Section, "spe_bound": Section, "diag_species": Section}
+
+    def __init__(self, label=None):
+        if isinstance(label, int):
+            label = "Configuration for cathode " + str(label)
+        SectionOrdered.__init__(self, label=label, order=Cathode.order, fixed=True, types=Cathode.types)
+
+
+class Neutral(SectionOrdered):
+    """Set of sections defining a neutral."""
+
+    # Keep the default order as a class variable, but copy to the instance to allow modification
+    order = ["neutral", "profile", "diag_neutral", "species", "spe_bound", "diag_species"]
+    types = {"neutral": Section, "profile": Section, "diag_neutral": Section, "species": Section, "spe_bound": Section,
+             "diag_species": Section}
+
+    def __init__(self, label=None):
+        if isinstance(label, int):
+            label = "Configuration for neutral " + str(label)
+        SectionOrdered.__init__(self, label=label, order=Neutral.order, fixed=True, types=Neutral.types)
 
 
 # Types of lists of sections
 
 class SpeciesList(SectionList):
     def __init__(self, label="species"):
-        # FIXME: Due to dimension parameter in Species.__init__ this will fail if used
         SectionList.__init__(self, label=label, default_type=Species)
 
 
 class CathodeList(SectionList):
     def __init__(self, label="cathodes"):
-        SectionList.__init__(self, label=label, default_type="cathode")
+        SectionList.__init__(self, label=label, default_type=Cathode)
 
 
 class NeutralList(SectionList):
     def __init__(self, label="neutrals"):
-        SectionList.__init__(self, label=label, default_type="neutral")
+        SectionList.__init__(self, label=label, default_type=Neutral)
 
 
 class NeutralMovIonsList(SectionList):
     def __init__(self, label="neutral moving ions"):
-        SectionList.__init__(self, label=label, default_type="neutral_mov_ions")
+        #TODO: Write me
+        raise NotImplementedError("Neutral moving ions are not yet implemented")
+        #SectionList.__init__(self, label=label, default_type="neutral_mov_ions")
 
 
 class ZpulseList(SectionList):
@@ -330,15 +361,16 @@ class ConfigFile(SectionOrdered):
     """
     order = ["simulation", "node_conf", "grid", "time_step", "restart", "space", "time", "el_mag_fld", "emf_bound",
              "smooth", "diag_emf", "particles", "species_list", "cathode_list", "neutral_list", "neutral_mov_ions_list",
-             "zpulse_list", "current", "smooth_current"]
+             "collisions", "zpulse_list", "current", "smooth_current"]
 
     # FIXME: There are two "smooths" in the config file definition. I have renamed the second to smooth_current, but the output form must change
+    # TODO: Add antenna
 
     types = {"simulation": Section, "node_conf": Section, "grid": Section, "time_step": Section, "restart": Section,
              "space": Section, "time": Section, "el_mag_fld": Section, "emf_bound": Section, "smooth": Section,
-             "diag_emf": Section, "particles": Section, "species_list": SpeciesList, "cathode_list": CathodeList,
-             "neutral_list": NeutralList, "neutral_mov_ions_list": NeutralMovIonsList, "zpulse_list": ZpulseList,
-             "current": Section, "smooth_current": Section}
+             "diag_emf": Section, "particles": Section, "species_list": SpeciesList, "cathode_list": SpeciesList,
+             "neutral_list": NeutralList, "neutral_mov_ions_list": NeutralMovIonsList, "collisions": Section,
+             "zpulse_list": ZpulseList, "current": Section, "smooth_current": Section}
 
     def __init__(self, d):
         """
@@ -370,9 +402,10 @@ class ConfigFile(SectionOrdered):
 
         self["particles"] = Section("particles", {"num_species": 2})
 
-        self["species_list"] = SectionList(label="Species configuration")
+        self["species_list"] = SpeciesList(label="Species configuration")
+
         for i in [1, 2]:
-            self["species_list"].append_section(Species(d, i))
+            self["species_list"].append_section(Species(i, dim=d))
 
     def _update_particles(self):
         """Update the particles Section with the currently set data"""
