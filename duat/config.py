@@ -178,6 +178,9 @@ class SectionList(MetaSection):
                     self.append_section(self.default_type())
             self.lst.append(value)
 
+    def __len__(self):
+        return len(self.lst)
+
     def append_section(self, section):
         self.lst.append(section)
 
@@ -333,8 +336,8 @@ class ConfigFile(SectionOrdered):
 
     types = {"simulation": Section, "node_conf": Section, "grid": Section, "time_step": Section, "restart": Section,
              "space": Section, "time": Section, "el_mag_fld": Section, "emf_bound": Section, "smooth": Section,
-             "diag_emf": Section, "particles": Section, "species_list": SectionList, "cathode_list": SectionList,
-             "neutral_list": SectionList, "neutral_mov_ions_list": SectionList, "zpulse_list": ZpulseList,
+             "diag_emf": Section, "particles": Section, "species_list": SpeciesList, "cathode_list": CathodeList,
+             "neutral_list": NeutralList, "neutral_mov_ions_list": NeutralMovIonsList, "zpulse_list": ZpulseList,
              "current": Section, "smooth_current": Section}
 
     def __init__(self, d):
@@ -370,6 +373,18 @@ class ConfigFile(SectionOrdered):
         self["species_list"] = SectionList(label="Species configuration")
         for i in [1, 2]:
             self["species_list"].append_section(Species(d, i))
+
+    def _update_particles(self):
+        """Update the particles Section with the currently set data"""
+        self["particles"]["num_species"] = len(self["species_list"]) if "species_list" in self.subsections else 0
+        self["particles"]["num_cathode"] = len(self["cathode_list"]) if "cathode_list" in self.subsections else 0
+        self["particles"]["num_neutral"] = len(self["neutral_list"]) if "neutral_list" in self.subsections else 0
+        self["particles"]["num_neutral_mov_ions"] = len(
+            self["neutral_mov_ions_list"]) if "neutral_mov_ions_list" in self.subsections else 0
+
+    def to_fortran(self):
+        self._update_particles()
+        return SectionOrdered.to_fortran(self)
 
     def write(self, path):
         """
