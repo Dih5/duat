@@ -12,6 +12,7 @@ import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker
+from matplotlib.colors import LogNorm
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 from duat.common import ensure_dir_exists, human_order_key, MPCaller, Call, logger
@@ -450,7 +451,8 @@ class Diagnostic:
         return fig, ax, anim
 
     def time_1d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
-                         dpi=200, latex_label=True, cmap=None, log_map=False, show=True):
+                         dpi=200, latex_label=True, cmap=None, log_map=False, show=True, rasterized=True,
+                         contour_plot=False):
         """
         Generate a colormap in an axis and the time.
     
@@ -472,6 +474,9 @@ class Diagnostic:
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
             log_map (bool): Whether the map is plot in log scale.
             show (bool): Whether to show the plot. This is blocking if matplotlib is in non-interactive mode.
+            rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
+                               images with large amount of data exported to PDF might challenging to handle.
+            contour_plot (bool): Whether contour lines are plot instead of the density map.
             
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`): Objects representing the generated plot.
@@ -528,19 +533,56 @@ class Diagnostic:
         # Gather the points
         x_min, x_max = axis["MIN"], axis["MAX"]
         z = np.asarray(list(gen))
-        if log_map:
-            # Mask manually to prevent a UserWarning
-            contour_plot = ax.contourf(axis["LIST"], time_list, np.ma.masked_where(z <= 0, z),
+
+        # Options are different for contourf and pcolormesh methods. If the number of cases to distinguish increases
+        # procedurally build the call instead of further adding if clauses.
+
+        if contour_plot:
+            # Rasterizing in contourf is a bit tricky
+            # Cf. http://stackoverflow.com/questions/33250005/size-of-matplotlib-contourf-image-files
+            if log_map:
+                # Mask manually to prevent a UserWarning
+                if rasterized:
+                    plot = ax.contourf(axis["LIST"], time_list, np.ma.masked_where(z <= 0, z),
+                                       locator=ticker.LogLocator(), cmap=cmap, zorder=-9)
+                    ax.set_rasterization_zorder(-1)
+                else:
+                    plot = ax.contourf(axis["LIST"], time_list, np.ma.masked_where(z <= 0, z),
                                        locator=ticker.LogLocator(), cmap=cmap)
+            else:
+                if rasterized:
+                    plot = ax.contourf(axis["LIST"], time_list, z, cmap=cmap, zorder=-9)
+                    ax.set_rasterization_zorder(-1)
+                else:
+                    plot = ax.contourf(axis["LIST"], time_list, z, cmap=cmap)
         else:
-            contour_plot = ax.contourf(axis["LIST"], time_list, z, cmap=cmap)
+            # Although pcolormesh works with the rasterize option, the tricky method can also be used
+            if log_map:
+                # Mask manually to prevent a UserWarning
+                masked_z = np.ma.masked_where(z <= 0, z)
+                z_min = masked_z.min()
+                z_max = masked_z.max()
+                # TODO: Sometimes z_min is not an interesting value. Perhaps add a parameter to set it.
+                if rasterized:
+                    plot = ax.pcolormesh(axis["LIST"], time_list, masked_z, norm=LogNorm(vmin=z_min, vmax=z_max),
+                                         cmap=cmap, zorder=-9)
+                    ax.set_rasterization_zorder(-1)
+                else:
+                    plot = ax.pcolormesh(axis["LIST"], time_list, masked_z, norm=LogNorm(vmin=z_min, vmax=z_max),
+                                         cmap=cmap)
+            else:
+                if rasterized:
+                    plot = ax.pcolormesh(axis["LIST"], time_list, z, cmap=cmap, zorder=-9)
+                    ax.set_rasterization_zorder(-1)
+                else:
+                    plot = ax.pcolormesh(axis["LIST"], time_list, z, cmap=cmap)
 
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(time_list[0], time_list[-1])
 
         ax.set_title("%s (%s)" % (title_name, title_units))
 
-        fig.colorbar(contour_plot)
+        fig.colorbar(plot)
 
         if output_path:  # "" or None
             plt.savefig(output_path, dpi=dpi)
