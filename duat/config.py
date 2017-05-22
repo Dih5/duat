@@ -134,12 +134,49 @@ class SectionList(MetaSection):
     
     """
 
-    def __init__(self, label=None, lst=None):
+    def __init__(self, label=None, lst=None, default_type=None):
+        """
+        
+        Args:
+            label (str): a label inserted as a comment when generating fortran code.
+            lst (list of MetaSection): a preexisting list of sections conforming this one. 
+            default_type (str or class): the default type for implicit creation of content. If a str, a Section with the
+                                         provided name will be created. Otherwise, a instance of the provided class with
+                                         no parameters will be created.
+        """
         self.label = label if label else ""
         self.lst = lst if lst else []
+        self.default_type = default_type
 
     def __getitem__(self, ind):
+        if ind < len(self.lst):
+            return self.lst[ind]
+        if self.default_type is None:
+            raise ValueError("A subsection cannot be implicitly added to the list due to unknown type.")
+        if ind > len(self.lst):
+            logger.warning("Implicitly creating more than one section in a list.")
+        for i in range(len(self.lst), ind + 1):
+            if isinstance(self.default_type, str):
+                self.append_section(Section(self.default_type))
+            else:
+                self.append_section(self.default_type())
         return self.lst[ind]
+
+    def __setitem__(self, ind, value):
+        if ind < len(self.lst):
+            self.lst[ind] = value
+        elif ind == len(self.lst):
+            self.lst.append(value)
+        else:
+            if self.default_type is None:
+                raise ValueError("A subsection cannot be implicitly added to the list due to unknown type.")
+            logger.warning("Implicitly added subsection(s).")
+            for i in range(len(self.lst), ind):
+                if isinstance(self.default_type, str):
+                    self.append_section(Section(self.default_type))
+                else:
+                    self.append_section(self.default_type())
+            self.lst.append(value)
 
     def append_section(self, section):
         self.lst.append(section)
@@ -256,6 +293,34 @@ class Species(SectionOrdered):
         self.set_section("diag_species", Section("diag_species"))
 
 
+# Types of lists of sections
+
+class SpeciesList(SectionList):
+    def __init__(self, label="species"):
+        # FIXME: Due to dimension parameter in Species.__init__ this will fail if used
+        SectionList.__init__(self, label=label, default_type=Species)
+
+
+class CathodeList(SectionList):
+    def __init__(self, label="cathodes"):
+        SectionList.__init__(self, label=label, default_type="cathode")
+
+
+class NeutralList(SectionList):
+    def __init__(self, label="neutrals"):
+        SectionList.__init__(self, label=label, default_type="neutral")
+
+
+class NeutralMovIonsList(SectionList):
+    def __init__(self, label="neutral moving ions"):
+        SectionList.__init__(self, label=label, default_type="neutral_mov_ions")
+
+
+class ZpulseList(SectionList):
+    def __init__(self, label="zpulses"):
+        SectionList.__init__(self, label=label, default_type="zpulse")
+
+
 class ConfigFile(SectionOrdered):
     """
     Set of Sections defining an input file.
@@ -269,7 +334,7 @@ class ConfigFile(SectionOrdered):
     types = {"simulation": Section, "node_conf": Section, "grid": Section, "time_step": Section, "restart": Section,
              "space": Section, "time": Section, "el_mag_fld": Section, "emf_bound": Section, "smooth": Section,
              "diag_emf": Section, "particles": Section, "species_list": SectionList, "cathode_list": SectionList,
-             "neutral_list": SectionList, "neutral_mov_ions_list": SectionList, "zpulse_list": SectionList,
+             "neutral_list": SectionList, "neutral_mov_ions_list": SectionList, "zpulse_list": ZpulseList,
              "current": Section, "smooth_current": Section}
 
     def __init__(self, d):
@@ -305,8 +370,6 @@ class ConfigFile(SectionOrdered):
         self["species_list"] = SectionList(label="Species configuration")
         for i in [1, 2]:
             self["species_list"].append_section(Species(d, i))
-
-            # self["pulse_sequence"] = ConfigSection("pulse_sequence", {"num_pulses": 0})
 
     def write(self, path):
         """
