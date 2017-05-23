@@ -151,7 +151,10 @@ class Run:
             int: The simulation step or -1 if it could not be found.
 
         """
-        last_line = tail(path.join(self.run_dir, "out.txt"), 8)
+        try:
+            last_line = tail(path.join(self.run_dir, "out.txt"), 8)
+        except FileNotFoundError:
+            return -1
         if not last_line:  # Empty file
             return -1
         if re.search("now at  t", last_line[-1]):
