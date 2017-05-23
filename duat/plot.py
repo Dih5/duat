@@ -452,7 +452,7 @@ class Diagnostic:
 
     def time_1d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
                          dpi=200, latex_label=True, cmap=None, log_map=False, show=True, rasterized=True,
-                         contour_plot=False):
+                         contour_plot=False, z_min=None, z_max=None):
         """
         Generate a colormap in an axis and the time.
     
@@ -472,11 +472,14 @@ class Diagnostic:
             dpi (int): The resolution of the file in dots per inch.
             latex_label (bool): Whether for use LaTeX code for the plot.
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
-            log_map (bool): Whether the map is plot in log scale.
+            log_map (bool): Whether the map is plot in log scale. If the log scale is too wide and values are not
+                            displayed in the bar, use the z_min or z_max parameters to fix it.
             show (bool): Whether to show the plot. This is blocking if matplotlib is in non-interactive mode.
             rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
                                images with large amount of data exported to PDF might challenging to handle.
             contour_plot (bool): Whether contour lines are plot instead of the density map.
+            z_min (float): Minimum value for the colormap. If None it is automatically set.
+            z_max (float): Maximum value for the colormap. If None it is automatically set.
             
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`): Objects representing the generated plot.
@@ -560,8 +563,10 @@ class Diagnostic:
             if log_map:
                 # Mask manually to prevent a UserWarning
                 masked_z = np.ma.masked_where(z <= 0, z)
-                z_min = masked_z.min()
-                z_max = masked_z.max()
+                if z_min is None:
+                    z_min = masked_z.min()
+                if z_max is None:
+                    z_max = masked_z.max()
                 # TODO: Sometimes z_min is not an interesting value. Perhaps add a parameter to set it.
                 if rasterized:
                     plot = ax.pcolormesh(axis["LIST"], time_list, masked_z, norm=LogNorm(vmin=z_min, vmax=z_max),
