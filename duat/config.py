@@ -178,6 +178,10 @@ class SectionList(MetaSection):
                     self.append_section(self.default_type())
             self.lst.append(value)
 
+    def __iter__(self):
+        for x in self.lst:
+            yield x
+
     def __len__(self):
         return len(self.lst)
 
@@ -229,6 +233,10 @@ class SectionOrdered(MetaSection):
         if isinstance(key, int):
             key = self.order[key]
         self.set_section(key, value)
+
+    def __iter__(self):
+        for x in self.lst:
+            yield x
 
     def set_section(self, name, section=None):
         """ Add or replace a section."""
@@ -345,9 +353,9 @@ class NeutralList(SectionList):
 
 class NeutralMovIonsList(SectionList):
     def __init__(self, label="neutral moving ions"):
-        #TODO: Write me
+        # TODO: Write me
         raise NotImplementedError("Neutral moving ions are not yet implemented")
-        #SectionList.__init__(self, label=label, default_type="neutral_mov_ions")
+        # SectionList.__init__(self, label=label, default_type="neutral_mov_ions")
 
 
 class ZpulseList(SectionList):
