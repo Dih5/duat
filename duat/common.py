@@ -142,15 +142,16 @@ class MPCaller:
     
     Attributes:
         processes (list of multiprocessing.Process): Processes managed by the instance.
-        num_threads (int): Number of processes the instance manages (if no :func:`spawn_threads` call is made).
         
     """
 
     def __init__(self, num_threads=2):
-        self.q = Queue()
+        self._queue = Queue()
         self.processes = []
-        self.num_threads = num_threads
         self.spawn_threads(num_threads)
+
+    def __repr__(self):
+        return "MPCaller<%d threads, %d tasks in _queue>" % (len(self.processes), self._queue.qsize())
 
     def spawn_threads(self, num_threads):
         """Create the required number of processes and add them to the caller.
@@ -159,7 +160,7 @@ class MPCaller:
         
         """
         for _ in range(num_threads):
-            t = Process(target=_caller, args=(self.q,))
+            t = Process(target=_caller, args=(self._queue,))
             t.daemon = True
             t.start()
             self.processes.append(t)
@@ -173,27 +174,28 @@ class MPCaller:
                              functions or a :class:`Call` instance.
 
         """
-        self.q.put(call)
+        self._queue.put(call)
 
     def wait_calls(self, blocking=True, respawn=False):
         """
-        Ask all processes to consume the queue and stop.
+        Ask all processes to consume the queue and stop after that.
         
         Args:
             blocking (bool): Whether to block the call, waiting for processes termination.
-            respawn (bool): If blocking is True, this indicates whether to respawn the number of threads created at
-                            initialization. Otherwise ignored (no automatic respawn if non-blocking).
+            respawn (bool): If blocking is True, this indicates whether to respawn the threads after the calls finish.
+                            If blocking is not True this is ignored (no automatic respawn if non-blocking).
 
         """
-        for _ in range(len(self.processes)):
-            self.q.put("END")
+        num_threads = len(self.processes)
+        for _ in range(num_threads):
+            self._queue.put("END")
 
         if blocking:
             for t in self.processes:
                 t.join()
             self.processes = []
             if respawn:
-                self.spawn_threads(self.num_threads)
+                self.spawn_threads(num_threads)
 
 
 def tail(path, lines=1, _step=4098):
