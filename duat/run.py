@@ -400,7 +400,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         return run
 
 
-def run_variation(config, variation, run_base, caller=None, **kwargs):
+def run_variation(config, variation, run_base, caller=None, on_existing=None, **kwargs):
     """
     Make consecutive calls to :func:`~duat.osiris.run.run_config` with ConfigFiles generated from a variation.
     
@@ -411,13 +411,24 @@ def run_variation(config, variation, run_base, caller=None, **kwargs):
         caller (int or `MPCaller`): If supplied, the calls will be managed by a MPCaller instance. If an int is provided
                                     an MPCaller with such a number of threads will be created. Provide an instance if
                                     interested in further controlling.
+        on_existing (str): Action to do if a run of the variation exists. Only the names of the subfolders are used for
+                           this purpose, which means the run could be different if the variation or the path have
+                           changed. Set to "ignore" to leave untouched existing runs or set to "overwrite" to delete the
+                           data and run a new instance. Default is like "ignore" but raising a warning.
         **kwargs: Keyword arguments to pass to :func:`~duat.osiris.run.run_config`
 
     Returns:
-        list: List with the return values of each call.
+        list of Run: List with the Run instances in the variation directory.
 
     """
     r_list = []
+
+    if on_existing is not None:
+        if not isinstance(on_existing, str):
+            raise ValueError("Invalid on_existing parameter")
+        on_existing = on_existing.lower()
+        if on_existing not in ["ignore", "overwrite"]:
+            raise ValueError("Invalid on_existing parameter")
 
     if caller is None:
         for i, c in enumerate(variation.get_generator(config)):
@@ -431,8 +442,19 @@ def run_variation(config, variation, run_base, caller=None, **kwargs):
             _caller = caller
 
         for i, c in enumerate(variation.get_generator(config)):
-            r = run_config(c, path.join(run_base, "var_" + str(i)), mpcaller=_caller, **kwargs)
-            r_list.append(r)
+            var_dir = path.join(run_base, "var_" + str(i))
+            if path.isfile(path.join(var_dir, "os-stdin")):
+                # If the item existed
+                if on_existing is None:
+                    logger.warning("Skipping existing variation item " + var_dir)
+                elif on_existing == "ignore":
+                    pass
+                else:  # overwrite
+                    run_config(c, var_dir, mpcaller=_caller, **kwargs)
+            else:
+                # The item did not exist
+                run_config(c, var_dir, mpcaller=_caller, **kwargs)
+            r_list.append(Run(var_dir))
 
         if isinstance(caller, int):
             # If the MPCaller was created in this method, threads should die after execution
