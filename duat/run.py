@@ -221,7 +221,7 @@ class Run:
         Estimated time to end the simulation in seconds.
         
         The estimation uses a linear model and considers initialization negligible.
-        The modification time of the os-stdin file is used in the calculation. If altered, estimation will be meaningless.
+        The start time of the process is used in the calculation. If the run was resumed, the estimation will be wrong.
         
         Returns: 
             float: The estimation of the time to end the simulation or NaN if no estimation could be done.
@@ -234,7 +234,7 @@ class Run:
             if current <= 0:  # If not dumped yet or error
                 return float('nan')
             else:
-                elapsed = time() - path.getmtime(path.join(self.run_dir, "os-stdin"))
+                elapsed = time() - self.process.create_time()
                 return elapsed * (self.total_steps / current - 1)
 
     def real_time(self):
