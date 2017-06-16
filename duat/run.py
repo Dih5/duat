@@ -340,6 +340,13 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         tuple: A Run instance describing the execution.
 
     """
+    # Normalize parameters
+    if not prefix:  # None or ""
+        prefix = ""
+    elif prefix[-1] != " ":
+        prefix += " "
+
+    # Search for possibly running processes
     candidates = _find_running_exe(path.join(run_dir, "osiris"))
     if candidates:
         if force == "ignore":
@@ -355,6 +362,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
             logger.warning("Running exe found in %s. Aborting launch." % run_dir)
             return
 
+    # Clean if needed
     if clean_dir:
         for root, dirs, files in walk(run_dir):
             for f in files:
@@ -364,17 +372,20 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
             for f in files:
                 logger.warning("Could not remove file %s" % f)
 
+    # copy the input file
     ensure_dir_exists(run_dir)
     config.write(path.join(run_dir, "os-stdin"))
+
+    # Copy the osiris executable
     osiris_path = path.abspath(path.join(run_dir, "osiris"))
     osiris = ifd(config.get_d(), osiris_1d, osiris_2d, osiris_3d)
     copyfile(osiris, osiris_path)
     ensure_executable(osiris_path)
 
-    if not prefix:  # None or ""
-        prefix = ""
-    elif prefix[-1] != " ":
-        prefix += " "
+    # Create a start.sh file to ease manual launch
+    with open(path.join(run_dir, "start.sh"), 'w') as f:
+        f.write("./osiris > out.txt 2> err.txt")
+    ensure_executable(path.join(run_dir, "start.sh"))
 
     if mpcaller is not None:
         run = Run(run_dir)
