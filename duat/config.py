@@ -175,7 +175,7 @@ class SectionList(MetaSection):
         """
         self.label = label if label else ""
         self.lst = lst if lst else []
-        if default_type is None:
+        if default_type is not None:
             self.default_type = default_type
         else:
             self.default_type = SectionList.default_type
@@ -183,14 +183,16 @@ class SectionList(MetaSection):
     def __getitem__(self, ind):
         if ind < len(self.lst):
             return self.lst[ind]
-        if self.default_type is None:
-            raise ValueError("A subsection cannot be implicitly added to the list due to unknown type.")
+        if self.default_type == Section:
+            raise ValueError("A subsection cannot be implicitly added to the list due to generic default type.")
         if ind > len(self.lst):
             logger.warning("Implicitly creating more than one section in a list.")
         for i in range(len(self.lst), ind + 1):
             if isinstance(self.default_type, str):
                 self.append_section(Section(self.default_type))
             else:
+                # Note default_type is not Section here, no reason to expect incorrect call arguments in general.
+                # Code analyzers may warn though.
                 self.append_section(self.default_type())
         return self.lst[ind]
 
@@ -207,6 +209,8 @@ class SectionList(MetaSection):
                 if isinstance(self.default_type, str):
                     self.append_section(Section(self.default_type))
                 else:
+                    # Note default_type is not Section here, no reason to expect incorrect call arguments in general.
+                    # Code analyzers may warn though.
                     self.append_section(self.default_type())
             self.lst.append(value)
 
