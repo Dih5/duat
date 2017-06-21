@@ -89,6 +89,24 @@ class MetaSection:
     def to_fortran(self):
         raise NotImplementedError()
 
+    @classmethod
+    def get_structure(cls, offset=0):
+        """
+        Get a string representing the structure of the class.
+
+        This methods returns a string with lines in the format "- index (type)", where index is the one used to access
+        a subitem and type is the class of that item.
+
+        Args:
+            offset: Two spaces times this number will be used to indent the returned string. This is used to generate a
+                    multi-level description.
+
+        Returns:
+            (str): A representation of the structure of the class.
+
+        """
+        return ""
+
 
 class Section(MetaSection):
     """The class defining a configuration block."""
@@ -123,7 +141,7 @@ class Section(MetaSection):
         return s
 
 
-# TODO: Add a class derived from ConfigSection with prefixed parameters.
+# TODO: Add a class derived from Section with prefixed parameters.
 
 
 class SectionList(MetaSection):
@@ -133,6 +151,17 @@ class SectionList(MetaSection):
     Here 'section' refers to any subclass of `MetaSection`.
     
     """
+
+    default_type = Section
+
+    @classmethod
+    def get_structure(cls, offset=0):
+        s = ""
+        t = Section if cls.default_type is None else cls.default_type
+        s += " " * (offset * 2) + "- 0 (%s)\n" % (t.__name__,)
+        s += t.get_structure(offset + 1)
+        s += " " * (offset * 2) + "- 1 ...\n"
+        return s
 
     def __init__(self, label=None, lst=None, default_type=None):
         """
@@ -146,7 +175,10 @@ class SectionList(MetaSection):
         """
         self.label = label if label else ""
         self.lst = lst if lst else []
-        self.default_type = default_type
+        if default_type is None:
+            self.default_type = default_type
+        else:
+            self.default_type = SectionList.default_type
 
     def __getitem__(self, ind):
         if ind < len(self.lst):
@@ -202,6 +234,20 @@ class SectionOrdered(MetaSection):
     Here 'section' refers to any subclass of `MetaSection`.
     
     """
+
+    order = None
+    types = None
+
+    @classmethod
+    def get_structure(cls, offset=0):
+        s = ""
+        for x in cls.order:
+            t = cls.types[x]
+            s += " " * (offset * 2) + "- %s (%s)\n" % (x, t.__name__)
+
+            s += t.get_structure(offset + 1)
+
+        return s
 
     def __init__(self, label=None, order=None, fixed=True, types=None):
         self.label = label if label else ""
@@ -338,24 +384,31 @@ class Neutral(SectionOrdered):
 
 class SpeciesList(SectionList):
     """List of sections defining the species"""
+    default_type = Species
+
     def __init__(self, label="species"):
-        SectionList.__init__(self, label=label, default_type=Species)
+        SectionList.__init__(self, label=label)
 
 
 class CathodeList(SectionList):
     """List of sections defining the cathodes"""
+    default_type = Cathode
+
     def __init__(self, label="cathodes"):
-        SectionList.__init__(self, label=label, default_type=Cathode)
+        SectionList.__init__(self, label=label)
 
 
 class NeutralList(SectionList):
     """List of sections defining the neutrals"""
+    default_type = Neutral
+
     def __init__(self, label="neutrals"):
-        SectionList.__init__(self, label=label, default_type=Neutral)
+        SectionList.__init__(self, label=label)
 
 
 class NeutralMovIonsList(SectionList):
     """List of sections defining the neutral moving ions"""
+
     def __init__(self, label="neutral moving ions"):
         # TODO: Write me
         raise NotImplementedError("Neutral moving ions are not yet implemented")
@@ -364,8 +417,10 @@ class NeutralMovIonsList(SectionList):
 
 class ZpulseList(SectionList):
     """List of sections defining the laser pulses"""
+
     def __init__(self, label="zpulses"):
         SectionList.__init__(self, label=label, default_type="zpulse")
+
 
 # Node sections
 
@@ -374,6 +429,7 @@ class SmoothCurrent(Section):
     def __init__(self, name):
         # Overwrite name with smooth
         Section.__init__(self, "smooth")
+
 
 # Global input file model
 
