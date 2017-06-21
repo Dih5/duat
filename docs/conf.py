@@ -21,6 +21,8 @@ import os
 import sys
 import sphinx_rtd_theme
 
+from recommonmark.parser import CommonMarkParser
+
 sys.path.insert(0, os.path.abspath('../'))
 
 # Mock the needed packages on RTD
@@ -59,11 +61,14 @@ extensions = [
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
+# Parser for md files
+source_parsers = {'.md': CommonMarkParser}
+
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-# source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = ['.rst', '.md']
+#source_suffix = '.rst'
 
 # The encoding of source files.
 #

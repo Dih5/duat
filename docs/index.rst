@@ -3,10 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-duat API documentation
-======================
+duat documentation
+==================
 
-Contents:
+API documentation:
 
 .. toctree::
    :maxdepth: 2
@@ -15,6 +15,14 @@ Contents:
    run.rst
    plot.rst
    common.rst
+
+
+Cookbook:
+
+.. toctree::
+   :maxdepth: 2
+
+   cookbook.md
 
 
 
