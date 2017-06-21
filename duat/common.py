@@ -85,35 +85,6 @@ def ensure_executable(path, all_users=None):
     os.chmod(path, st.st_mode | (0o111 if all_users else 0o100))
 
 
-def daemonize(func):
-    """
-    Run a function as a daemon.
-
-    Args:
-        func (`Callable`): The function to run as a daemon.
-
-    Raises:
-        OSError: An error occurred performing a fork.
-
-    """
-    # Create a son
-    pid = os.fork()
-    if pid > 0:  # Parent
-        return
-    # We are the son
-    os.setsid()
-
-    # Create a grandson
-
-    pid = os.fork()
-    if pid > 0:  # Son (not grandson)
-        os._exit(os.EX_OK)  # So no cleaning is performed
-
-    # We are the grandson
-    func()
-    os._exit(os.EX_OK)
-
-
 class Call:
     """Objectization of a call to be made. When an instance is called, such a call will be made."""
 
