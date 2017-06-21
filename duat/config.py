@@ -337,21 +337,25 @@ class Neutral(SectionOrdered):
 # Types of lists of sections
 
 class SpeciesList(SectionList):
+    """List of sections defining the species"""
     def __init__(self, label="species"):
         SectionList.__init__(self, label=label, default_type=Species)
 
 
 class CathodeList(SectionList):
+    """List of sections defining the cathodes"""
     def __init__(self, label="cathodes"):
         SectionList.__init__(self, label=label, default_type=Cathode)
 
 
 class NeutralList(SectionList):
+    """List of sections defining the neutrals"""
     def __init__(self, label="neutrals"):
         SectionList.__init__(self, label=label, default_type=Neutral)
 
 
 class NeutralMovIonsList(SectionList):
+    """List of sections defining the neutral moving ions"""
     def __init__(self, label="neutral moving ions"):
         # TODO: Write me
         raise NotImplementedError("Neutral moving ions are not yet implemented")
@@ -359,8 +363,19 @@ class NeutralMovIonsList(SectionList):
 
 
 class ZpulseList(SectionList):
+    """List of sections defining the laser pulses"""
     def __init__(self, label="zpulses"):
         SectionList.__init__(self, label=label, default_type="zpulse")
+
+# Node sections
+
+
+class SmoothCurrent(Section):
+    def __init__(self, name):
+        # Overwrite name with smooth
+        Section.__init__(self, "smooth")
+
+# Global input file model
 
 
 class ConfigFile(SectionOrdered):
@@ -371,14 +386,13 @@ class ConfigFile(SectionOrdered):
              "smooth", "diag_emf", "particles", "species_list", "cathode_list", "neutral_list", "neutral_mov_ions_list",
              "collisions", "zpulse_list", "current", "smooth_current"]
 
-    # FIXME: There are two "smooths" in the config file definition. I have renamed the second to smooth_current, but the output form must change
     # TODO: Add antenna
 
     types = {"simulation": Section, "node_conf": Section, "grid": Section, "time_step": Section, "restart": Section,
              "space": Section, "time": Section, "el_mag_fld": Section, "emf_bound": Section, "smooth": Section,
              "diag_emf": Section, "particles": Section, "species_list": SpeciesList, "cathode_list": SpeciesList,
              "neutral_list": NeutralList, "neutral_mov_ions_list": NeutralMovIonsList, "collisions": Section,
-             "zpulse_list": ZpulseList, "current": Section, "smooth_current": Section}
+             "zpulse_list": ZpulseList, "current": Section, "smooth_current": SmoothCurrent}
 
     def __init__(self, d):
         """
