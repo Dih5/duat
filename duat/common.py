@@ -168,6 +168,28 @@ class MPCaller:
             if respawn:
                 self.spawn_threads(num_threads)
 
+    def abort(self, interrupt=False):
+        """
+        Remove all queued calls and ask processes to stop.
+
+        Args:
+            interrupt: If True, terminate all processes.
+
+        """
+        for _ in range(len(self.processes)+1):
+            self._queue.put("END")
+        while True:
+            data = self._queue.get()
+            if data == "END":
+                break
+            # Else do nothing
+        if interrupt:
+            for t in self.processes:
+                t.terminate()
+            # If the killed process was trying to use the Queue it could have corrupted
+            # Just in case, create a new one
+            self._queue = Queue()
+
 
 def tail(path, lines=1, _step=4098):
     """
