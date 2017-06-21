@@ -281,7 +281,7 @@ class SectionOrdered(MetaSection):
         self.set_section(key, value)
 
     def __iter__(self):
-        for x in self.lst:
+        for x in self.order:
             yield x
 
     def set_section(self, name, section=None):
