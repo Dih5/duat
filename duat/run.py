@@ -158,7 +158,17 @@ class Run:
         if not last_line:  # Empty file
             return -1
         if re.search("now at  t", last_line[-1]):
-            return int(re.match(r".* n = *(.*?)$", last_line[-1]).group(1))
+            # Unless the line was incomplete, there should be a match with:
+            a = re.match(r".* n = *(.*?)$", last_line[-1])
+            if a:
+                return int(a.group(1))
+            # Otherwise, try the previous one
+            a = re.match(r".* n = *(.*?)$", last_line[-2])
+            if a:
+                return int(a.group(1))
+            else:
+                return -1  # Some error exists in the file
+
         elif " Osiris run completed normally\n" in last_line:
             return self.total_steps
         else:
