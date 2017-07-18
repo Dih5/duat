@@ -102,9 +102,10 @@ class Run:
     Attributes:
         run_dir (str): Directory where the run takes place.
         total_steps (int): Amount of time steps in the simulation.
-        process (psutil.Process): Representation of the process running the simulation. If no process is found it will
-                                  be None. Only in that case, methods that update the state of simulation will check if
-                                  a process has spawned when called.
+        running_mode (str): Can be "local" if a local process was found, "grid" if a grid job was found, or ""
+                            otherwise. A simulation launch in the grid but running in the local machine will be "local".
+        process (psutil.Process): If running_mode is "local", representation of the process running the simulation.
+        job (dict): If running_mode is "grid", information about the job of the simulation.
         
     Notes:
         Only single-process runs are supported at the moment. Resuming runs are neither supported yet.
@@ -167,15 +168,31 @@ class Run:
         try:
             if not candidates:  # No process running found
                 self.process = None
+                # Try to find a job in queu
+                jobs = _get_grid_jobs()
+                if not jobs:  # Either no qstat or empty list
+                    self.running_mode = ""
+                else:
+                    script_path = path.join(self.run_dir, "start.sh")
+                    valid_jobs = list(filter(lambda j: j["script"] == script_path, jobs))
+                    if valid_jobs:
+                        if len(valid_jobs) > 1:
+                            logger.warning("More than one grid job was found for the run.")
+                        self.job = valid_jobs[0]
+                        self.running_mode = "grid"
+
             elif len(candidates) > 1:
                 logger.warning("More than one pid was found for the run.\n"
                                "Multiple processes are not really handled by duat yet, do not trust what you see.")
                 self.process = psutil.Process(candidates[0])
+                self.running_mode = "local"
             else:
+                self.running_mode = "local"
                 self.process = psutil.Process(candidates[0])
         except psutil.NoSuchProcess:
             # If the process have died before processing was completed.
             self.process = None
+            self.running_mode = ""
 
     def current_step(self):
         """
@@ -210,17 +227,11 @@ class Run:
 
     def is_running(self):
         """Return True if the simulation is known to be running, or False otherwise."""
-        if self.process is None:
-            # Try to find a process only if none was found when the instance was created
-            self.update()
-            if self.process is None:
-                return False
-            else:
-                return self.process.is_running()
-        return self.process.is_running()
+        self.update()
+        return True if self.running_mode else False
 
     def is_finished(self):
-        if self.is_running():
+        if self.is_running():  # Which calls update
             return False
         else:
             if path.isfile(path.join(self.run_dir, "TIMINGS", "timings.001")):
@@ -230,17 +241,19 @@ class Run:
 
     def terminate(self):
         """Terminate the OSIRIS process (if running)."""
-        if self.process is not None:
-            if self.process.is_running():
-                try:
-                    self.process.terminate()
-                except psutil.NoSuchProcess:
-                    # The process has just terminated
-                    pass
-            else:
-                logger.warning("The process had already stopped")
+        self.update()
+        if self.running_mode == "local":
+            try:
+                self.process.terminate()
+            except psutil.NoSuchProcess:
+                # The process has just terminated
+                pass
+        elif self.running_mode == "grid":
+            # TODO: Write me and test me.
+            # subprocess.check_output("qdel %d" % self.job["job_number"], shell=True)
+            pass
         else:
-            logger.warning("Asked for termination of a Run with no known process")
+            logger.warning("Asked for termination of a Run not known to be running.")
 
     def kill(self):
         """
@@ -248,6 +261,7 @@ class Run:
         
         The :func:`~duat.osiris.run.Run.terminate` method should be used instead to perform a cleaner exit.
         """
+        # TODO: Update me
         if self.process is not None:
             if self.process.is_running():
                 try:
@@ -271,15 +285,23 @@ class Run:
             float: The estimation of the time to end the simulation or NaN if no estimation could be done.
 
         """
-        if not self.is_running():
+        self.update()
+        if not self.running_mode:
             return 0 if self.is_finished() else float("nan")
+        elif self.running_mode == "local":
+            start = self.process.create_time()
+        elif self.running_mode == "grid":
+            start = self.job["submission_time"]
+            # TODO: I guess submission time is not start time, so this might be not accurate if queue was full
         else:
-            current = self.current_step()
-            if current <= 0:  # If not dumped yet or error
-                return float('nan')
-            else:
-                elapsed = time() - self.process.create_time()
-                return elapsed * (self.total_steps / current - 1)
+            logger.warning("Invalid running_mode attribute")
+            return float("nan")
+        current = self.current_step()
+        if current <= 0:  # If not dumped yet or error
+            return float('nan')
+        else:
+            elapsed = time() - start
+            return elapsed * (self.total_steps / current - 1)
 
     def real_time(self):
         """Find the total time in seconds taken by the simulation if it has finished, otherwise returning nan."""
