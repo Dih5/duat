@@ -28,7 +28,7 @@ The package provides an interface to the OSIRIS code, allowing:
 ## Installation
 Assuming you have [Python](https://www.python.org/) with [pip](https://pip.pypa.io/en/stable/installing/):
 * To install the last 'stable' version from pypi: ```pip install duat```. Do not expect much [stability](#versioning) in the API though...
-* To install the last development version: ```pip install https://github.com/dih5/duat/archive/master.zip```. 
+* To install the last development version: ```pip install --upgrade https://github.com/dih5/duat/archive/master.zip```. 
 
 If you are a [cool guy](https://wiki.python.org/moin/Python2orPython3) you'll prefer to use python3 and pip3 instead, unless you are a cool [Arch Linux user](https://www.archlinux.org/news/python-is-now-python-3/).
 
