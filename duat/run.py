@@ -11,7 +11,8 @@ from time import sleep, time
 import psutil
 
 from duat.plot import get_diagnostic_list as _get_diagnostic_list
-from duat.common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key, MPCaller, \
+from duat.common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key, \
+    MPCaller, \
     Call
 
 # Path to osiris executables - guessed later in the code
@@ -337,7 +338,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
     Args:
         config (`ConfigFile`): The instance describing the configuration file.
         run_dir (str): Folder where the run is carried.
-        prefix (str): A prefix to run the command (e.g., "qsub", ...).
+        prefix (str): A prefix to run the command.
         clean_dir (bool): Whether to remove the files in the directory before execution.
         blocking (bool): Whether to wait for the run to finish.
         force (str): Set what to do if a running executable is found in the directory. Set to "ignore" to launch anyway,
@@ -421,6 +422,57 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         return run
 
 
+def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, clean_dir=True):
+    """
+    Queue a OSIRIS run in a DRMAA-compatible grid (e.g., Sun Grid Engine).
+
+    Args:
+        config (`ConfigFile`): The instance describing the configuration file.
+        run_dir (str): Folder where the run will be carried.
+        run_name (str): Name of the job in the engine.
+        remote_dir (str): If provided, a remote directory where the run will be carried, which might be only available
+                          in the node selected by the engine. Note hat if this option is used, the returned Run objects
+                          will not access the remote_dir, but the run_dir.
+        clean_dir (bool): Whether to remove the files in the directory before execution.
+
+    Returns:
+        tuple: A Run instance describing the execution.
+
+    """
+    # Clean if needed
+    if clean_dir:
+        for root, dirs, files in walk(run_dir):
+            for f in files:
+                remove(path.join(root, f))
+
+        for root, dirs, files in walk(run_dir):
+            for f in files:
+                logger.warning("Could not remove file %s" % f)
+
+    # copy the input file
+    ensure_dir_exists(run_dir)
+    config.write(path.join(run_dir, "os-stdin"))
+
+    # Copy the osiris executable
+    osiris_path = path.abspath(path.join(run_dir, "osiris"))
+    osiris = ifd(config.get_d(), osiris_1d, osiris_2d, osiris_3d)
+    copyfile(osiris, osiris_path)
+    ensure_executable(osiris_path)
+
+    # Create a start.sh file with the launch script
+    s = "".join(["#!/bin/bash\n#\n#$ -cwd\n#$ -S /bin/bash\n#$ -N %s\n#\n" % run_name,
+                 "NEW_DIR=%s\nmkdir -p $NEW_DIR\ncp -r . $NEW_DIR\ncd $NEW_DIR\n" % remote_dir if remote_dir else "",
+                 "\n./osiris > out.txt 2> err.txt"])
+
+    with open(path.join(run_dir, "start.sh"), 'w') as f:
+        f.write(s)
+    ensure_executable(path.join(run_dir, "start.sh"))
+
+    subprocess.Popen("qsub " + path.join(run_dir, "start.sh"), shell=True, cwd=path.abspath(run_dir))
+
+    return Run(run_dir)
+
+
 def run_variation(config, variation, run_base, caller=None, on_existing=None, **kwargs):
     """
     Make consecutive calls to :func:`~duat.osiris.run.run_config` with ConfigFiles generated from a variation.
@@ -481,6 +533,52 @@ def run_variation(config, variation, run_base, caller=None, on_existing=None, **
             # If the MPCaller was created in this method, threads should die after execution
             _caller.wait_calls(blocking=False)
             # Nevertheless, processes seems not to be discarded until a new call to this method is made
+    return r_list
+
+
+def run_variation_grid(config, variation, run_base, on_existing=None, **kwargs):
+    """
+    Make consecutive calls to :func:`~duat.osiris.run.run_config_grid` with ConfigFiles generated from a variation.
+
+    Args:
+        config (`ConfigFile`): Base configuration file.
+        variation (`Variation`): Description of the variations to apply.
+        run_base (str): Path to the directory where the runs will take place, each in a folder named var_number.
+        on_existing (str): Action to do if a run of the variation exists. Only the names of the subfolders are used for
+                           this purpose, which means the run could be different if the variation or the path have
+                           changed. Set to "ignore" to leave untouched existing runs or set to "overwrite" to delete the
+                           data and run a new instance. Default is like "ignore" but raising a warning.
+        **kwargs: Keyword arguments to pass to :func:`~duat.osiris.run.run_config_grid`
+
+    Returns:
+        list of Run: List with the Run instances in the variation directory.
+
+    """
+    r_list = []
+    # TODO: Either support remote_dir option here or delete it from run_config_grid
+    if on_existing is not None:
+        if not isinstance(on_existing, str):
+            raise ValueError("Invalid on_existing parameter")
+        on_existing = on_existing.lower()
+        if on_existing not in ["ignore", "overwrite"]:
+            raise ValueError("Invalid on_existing parameter")
+
+    for i, c in enumerate(variation.get_generator(config)):
+        var_name = "var_" + str(i)
+        var_dir = path.join(run_base, var_name)
+        if path.isfile(path.join(var_dir, "os-stdin")):
+            # If the item existed
+            if on_existing is None:
+                logger.warning("Skipping existing variation item " + var_dir)
+            elif on_existing == "ignore":
+                pass
+            else:  # overwrite
+                run_config_grid(c, var_dir, run_name="osiris_" + var_name, **kwargs)
+        else:
+            # The item did not exist
+            run_config_grid(c, var_dir, run_name="osiris_" + var_name, **kwargs)
+        r_list.append(Run(var_dir))
+
     return r_list
 
 
