@@ -120,28 +120,26 @@ class Run:
             run_dir (str): Path where the OSIRIS run takes place. An os-stdin file must exist there.
              
         Raises:
-            ValueError: If no os-stdin is found.
+            FileNotFoundError: If no os-stdin is found.
             
         """
         self.run_dir = run_dir
         self._run_dir_name = path.basename(run_dir)
-        try:
-            with open(path.join(run_dir, "os-stdin"), "r") as f:
-                text = f.read()
-            r = re.match(r".*time_step(.*?){(.*?)dt(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
-            if not r:
-                raise ValueError("No dt found in os-stdin.")
-            dt = float(r.group(4))
-            r = re.match(r".*time(.*?){(.*?)tmin(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
-            t_min = float(r.group(4)) if r else 0.0
-            r = re.match(r".*time(.*?){(.*?)tmax(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
-            if not r:
-                raise ValueError("No tmax found in os-stdin. Default value 0.0 is trivial.")
-            t_max = float(r.group(4))
 
-            self.total_steps = int((t_max - t_min) // dt) + 1
-        except FileNotFoundError:
-            raise ValueError("No os-stdin file in %s" % run_dir)
+        with open(path.join(run_dir, "os-stdin"), "r") as f:
+            text = f.read()
+        r = re.match(r".*time_step(.*?){(.*?)dt(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
+        if not r:
+            raise ValueError("No dt found in os-stdin.")
+        dt = float(r.group(4))
+        r = re.match(r".*time(.*?){(.*?)tmin(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
+        t_min = float(r.group(4)) if r else 0.0
+        r = re.match(r".*time(.*?){(.*?)tmax(.*?)=(.*?),(.*?)}", text, re.DOTALL + re.MULTILINE)
+        if not r:
+            raise ValueError("No tmax found in os-stdin. Default value 0.0 is trivial.")
+        t_max = float(r.group(4))
+
+        self.total_steps = int((t_max - t_min) // dt) + 1
 
         self.update()
 
