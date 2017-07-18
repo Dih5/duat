@@ -7,6 +7,7 @@ from glob import glob
 from os import path, remove, walk, listdir, environ
 from shutil import copyfile
 from time import sleep, time
+from xml.etree import ElementTree
 
 import psutil
 
@@ -60,6 +61,38 @@ def _find_running_exe(exe):
             if pinfo["exe"] and pinfo['exe'] == exe:
                 candidates.append(pinfo['pid'])
     return candidates
+
+
+def _get_grid_jobs():
+    """
+    Get information of active jobs in qstat
+    
+    Returns:
+        list of dict: A list of dictionaries, each with info of a running process. Available keys include:
+            job_number (int): The number identifying the job.
+            script (str): Path to script launching the job.
+            submission_time (int): Unix time when the job was submitted.
+            cwd (str): Path of the current working directory.
+            
+            
+    """
+    try:
+        output = subprocess.check_output("qstat -xml 2> /dev/null", shell=True)
+    except subprocess.CalledProcessError:
+        return None  # qstat not available
+    tree = ElementTree.fromstring(output)
+    jobs = []
+    for job in tree.iter('job_list'):
+        job_number = job[0].text
+        output = subprocess.check_output("qstat -j %s -xml" % job[0].text, shell=True)
+        job_tree = ElementTree.fromstring(output)[0][0]  # First index is djob_info, second is element
+        jobs.append({
+            "job_number": int(job_number),
+            "script": job_tree.find("JB_script_file").text,
+            "submission_time": int(job_tree.find("JB_submission_time").text),
+            "cwd": job_tree.find("JB_cwd").text,
+        })
+    return jobs
 
 
 class Run:
