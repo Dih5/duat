@@ -140,6 +140,9 @@ class Run:
         t_max = float(r.group(4))
 
         self.total_steps = int((t_max - t_min) // dt) + 1
+        self.running_mode = ""
+        self.process = None
+        self.job = None
 
         self.update()
 
@@ -238,7 +241,15 @@ class Run:
                 return False
 
     def terminate(self):
-        """Terminate the OSIRIS process (if running)."""
+        """
+        Terminate the OSIRIS process (if running).
+
+        If runnning is "local", sends SIGINT to the process. If "grid", calls qdel.
+
+        Raises:
+            subprocess.CalledProcessError: If using a grid and qdel fails.
+
+        """
         self.update()
         if self.running_mode == "local":
             try:
@@ -247,8 +258,7 @@ class Run:
                 # The process has just terminated
                 pass
         elif self.running_mode == "grid":
-            # TODO: Write me and test me.
-            # subprocess.check_output("qdel %d" % self.job["job_number"], shell=True)
+            subprocess.check_call("qdel %d" % self.job["job_number"], shell=True)
             pass
         else:
             logger.warning("Asked for termination of a Run not known to be running.")
@@ -258,19 +268,25 @@ class Run:
         Abruptly terminate the OSIRIS process (if running).
         
         The :func:`~duat.osiris.run.Run.terminate` method should be used instead to perform a cleaner exit.
+
+        If runnning is "local", sends SIGKILL to the process. If "grid", calls qdel.
+
+        Raises:
+            subprocess.CalledProcessError: If using a grid and qdel fails.
+
         """
-        # TODO: Update me
-        if self.process is not None:
-            if self.process.is_running():
-                try:
-                    self.process.kill()
-                except psutil.NoSuchProcess:
-                    # The process has just terminated
-                    pass
-            else:
-                logger.warning("The process had already stopped")
+        self.update()
+        if self.running_mode == "local":
+            try:
+                self.process.kill()
+            except psutil.NoSuchProcess:
+                # The process has just terminated
+                pass
+        elif self.running_mode == "grid":
+            subprocess.check_call("qdel %d" % self.job["job_number"], shell=True)
+            pass
         else:
-            logger.warning("Asked for termination of a Run with no known process")
+            logger.warning("Asked for termination of a Run not known to be running.")
 
     def estimated_time(self):
         """
@@ -477,7 +493,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
 
 def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, clean_dir=True):
     """
-    Queue a OSIRIS run in a DRMAA-compatible grid (e.g., Sun Grid Engine).
+    Queue a OSIRIS run in a compatible grid (e.g., Sun Grid Engine).
 
     Args:
         config (`ConfigFile`): The instance describing the configuration file.
