@@ -181,6 +181,8 @@ class Run:
                             logger.warning("More than one grid job was found for the run.")
                         self.job = valid_jobs[0]
                         self.running_mode = "grid"
+                    else:  # No queued job
+                        self.running_mode = ""
 
             elif len(candidates) > 1:
                 logger.warning("More than one pid was found for the run.\n"
