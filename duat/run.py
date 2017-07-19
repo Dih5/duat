@@ -390,15 +390,10 @@ def open_run_list(base_path, filter=None):
     return [Run(x) for x in [path.join(base_path, y) for y in dir_list]]
 
 
-def _execute_run(prefix, osiris_path, run_dir, run_object=None):
-    """Execute and wait for a run to finish, optionally updating a Run instance when the call is made."""
+def _execute_run(prefix, osiris_path, run_dir):
+    """Execute and wait for a run to finish"""
     # Cf. run_config
     p = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
-    if run_object is not None:
-        # TODO: The run_object updates in the process created by MPCaller, where it is useless.
-        # Probably it is not worth sharing the object. User may call the Run.update method if interested.
-        sleep(0.2)
-        run_object.update()
     p.wait()
 
 
@@ -472,7 +467,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
     if mpcaller is not None:
         run = Run(run_dir)
         # Set the run instance to update the process info when the call is made.
-        mpcaller.add_call(Call(_execute_run, prefix, osiris_path, run_dir, run_object=run))
+        mpcaller.add_call(Call(_execute_run, prefix, osiris_path, run_dir))
         return run
     else:
         proc = subprocess.Popen(prefix + osiris_path + " > out.txt 2> err.txt", shell=True, cwd=path.abspath(run_dir))
@@ -482,7 +477,8 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
             sleep(0.2)
 
         # BEWARE: Perhaps under extreme circumstances, OSIRIS might have not started despite sleeping.
-        # This could be solved reinstantiating RUN. Consider it a feature instead of a bug :P
+        # This could be solved calling the update method of the Run instance.
+        # Consider this a feature instead of a bug :P
 
         run = Run(run_dir)
 
