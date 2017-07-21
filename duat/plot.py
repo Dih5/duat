@@ -244,6 +244,9 @@ class Diagnostic:
                     return f[self.keys[0]][:]
 
         if axes_selector is not None:
+            if len(axes_selector) != len(self.axes):
+                raise ValueError("Invalid axes_selector parameter. Length must be %d. Check the axes of the Diagnostic instance." % len(self.axes))
+
             def f_axes_selector(x):
                 offset = 1 if multiple_datasets else 0  # If multiple dataset, do not count its axis for reduction
                 for i, sel in enumerate(axes_selector):
@@ -294,6 +297,8 @@ class Diagnostic:
             axes.append(self.datasets_as_axis)
 
         if axes_selector is not None:
+            if len(axes_selector) != len(self.axes):
+                raise ValueError("Invalid axes_selector parameter. Length must be %d. Check the axes of the Diagnostic instance." % len(self.axes))
             for i, sel in enumerate(axes_selector):
                 if sel is None:
                     axes.append(self.axes[i])
