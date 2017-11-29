@@ -224,6 +224,10 @@ class SectionList(MetaSection):
     def append_section(self, section):
         self.lst.append(section)
 
+    def remove_section(self, number=-1):
+        """Remove the section in the position given the index. By default, the last one."""
+        self.lst.pop(number)
+
     def to_fortran(self):
         s = ("!---" + self.label + "\n") if self.label else ""
         for sec in self.lst:
