@@ -15,6 +15,7 @@ API documentation:
    run.rst
    plot.rst
    common.rst
+   data.rst
 
 
 Cookbook:
