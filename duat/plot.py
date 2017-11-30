@@ -45,6 +45,32 @@ def _improve_latex(s):
     return s2
 
 
+def _create_label(name, units, latex_label=False):
+    """
+    Prepare a label for a plot
+    
+    Args:
+        name (str): Text describing the magnitude 
+        units (str): Text describing the units 
+        latex_label (bool): Whether to use LaTeX 
+
+    Returns:
+        str: The desired label
+
+    """
+    if latex_label:
+        if units:
+            units = "$" + _improve_latex(units) + "$"
+        # Names might be text or LaTeX. Try to guess
+        if _is_latex(name):
+            name = "$" + _improve_latex(name) + "$"
+
+    if units:
+        return "%s (%s)" % (name, units)
+    else:
+        return name
+
+
 class Diagnostic:
     """
     A OSIRIS diagnostic.
@@ -379,28 +405,11 @@ class Diagnostic:
 
         x_name = axis["LONG_NAME"]
         x_units = axis["UNITS"]
-        with h5py.File(self.file_list[0], "r") as f:
-            y_name = f[self.keys[0]].attrs["LONG_NAME"][0].decode('UTF-8')
-            y_units = f[self.keys[0]].attrs["UNITS"][0].decode('UTF-8')
-        if latex_label:
-            if x_units:
-                x_units = "$" + _improve_latex(x_units) + "$"
-            if y_units:
-                y_units = "$" + _improve_latex(y_units) + "$"
-            # Names might be text or LaTeX. Try to guess
-            if _is_latex(x_name):
-                x_name = "$" + _improve_latex(x_name) + "$"
-            if _is_latex(y_name):
-                y_name = "$" + _improve_latex(y_name) + "$"
+        y_name = self.data_name
+        y_units = self.units
 
-        if x_units:
-            ax.set_xlabel("%s (%s)" % (x_name, x_units))
-        else:
-            ax.set_xlabel("%s" % (x_name,))
-        if y_units:
-            ax.set_ylabel("%s (%s)" % (y_name, y_units))
-        else:
-            ax.set_ylabel("%s" % (y_name,))
+        ax.set_xlabel(_create_label(x_name, x_units, latex_label))
+        ax.set_ylabel(_create_label(y_name, y_units, latex_label))
 
         # Plot the points
         x_min, x_max = axis["MIN"], axis["MAX"]
@@ -516,29 +525,11 @@ class Diagnostic:
         title_name = self.data_name
         title_units = self.units
 
-        if latex_label:
-            if x_units:
-                x_units = "$" + _improve_latex(x_units) + "$"
-            if y_units:
-                y_units = "$" + _improve_latex(y_units) + "$"
-            if title_units:
-                title_units = "$" + _improve_latex(title_units) + "$"
-            # Names might be text or LaTeX. Try to guess
-            if _is_latex(x_name):
-                x_name = "$" + _improve_latex(x_name) + "$"
-            if _is_latex(y_name):
-                y_name = "$" + _improve_latex(y_name) + "$"
-            if _is_latex(title_name):
-                title_name = "$" + _improve_latex(title_name) + "$"
+        ax.set_xlabel(_create_label(x_name, x_units, latex_label))
+        ax.set_ylabel(_create_label(y_name, y_units, latex_label))
 
-        if x_units:
-            ax.set_xlabel("%s (%s)" % (x_name, x_units))
-        else:
-            ax.set_xlabel("%s" % (x_name,))
-        if y_units:
-            ax.set_ylabel("%s (%s)" % (y_name, y_units))
-        else:
-            ax.set_ylabel("%s" % (y_name,))
+        if latex_label and _is_latex(title_name):
+            title_name = "$" + _improve_latex(title_name) + "$"
 
         time_list = self.get_time_list(time_selector)
 
@@ -662,29 +653,11 @@ class Diagnostic:
         title_name = self.data_name
         title_units = self.units
 
-        if latex_label:
-            if x_units:
-                x_units = "$" + _improve_latex(x_units) + "$"
-            if y_units:
-                y_units = "$" + _improve_latex(y_units) + "$"
-            if title_units:
-                title_units = "$" + _improve_latex(title_units) + "$"
-            # Names might be text or LaTeX. Try to guess
-            if _is_latex(x_name):
-                x_name = "$" + _improve_latex(x_name) + "$"
-            if _is_latex(y_name):
-                y_name = "$" + _improve_latex(y_name) + "$"
-            if _is_latex(title_name):
-                title_name = "$" + _improve_latex(title_name) + "$"
+        ax.set_xlabel(_create_label(x_name, x_units, latex_label))
+        ax.set_ylabel(_create_label(y_name, y_units, latex_label))
 
-        if x_units:
-            ax.set_xlabel("%s (%s)" % (x_name, x_units))
-        else:
-            ax.set_xlabel("%s" % (x_name,))
-        if y_units:
-            ax.set_ylabel("%s (%s)" % (y_name, y_units))
-        else:
-            ax.set_ylabel("%s" % (y_name,))
+        if latex_label and _is_latex(title_name):
+            title_name = "$" + _improve_latex(title_name) + "$"
 
         time_list = self.get_time_list(time_selector)
 
@@ -818,25 +791,8 @@ class Diagnostic:
         title_name = self.data_name
         title_units = self.units
 
-        if latex_label:
-            if x_units:
-                x_units = "$" + _improve_latex(x_units) + "$"
-            if y_units:
-                y_units = "$" + _improve_latex(y_units) + "$"
-            # Names might be text or LaTeX. Try to guess
-            if _is_latex(x_name):
-                x_name = "$" + _improve_latex(x_name) + "$"
-            if _is_latex(y_name):
-                y_name = "$" + _improve_latex(y_name) + "$"
-
-        if x_units:
-            ax.set_xlabel("%s (%s)" % (x_name, x_units))
-        else:
-            ax.set_xlabel("%s" % (x_name,))
-        if y_units:
-            ax.set_ylabel("%s (%s)" % (y_name, y_units))
-        else:
-            ax.set_ylabel("%s" % (y_name,))
+        ax.set_xlabel(_create_label(x_name, x_units, latex_label))
+        ax.set_ylabel(_create_label(y_name, y_units, latex_label))
 
         # Gather the points
         x_min, x_max = axes[0]["MIN"], axes[0]["MAX"]
@@ -874,7 +830,7 @@ class Diagnostic:
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)
 
-        ax.set_title("%s (%s)" % (title_name, title_units))
+        ax.set_title(_create_label(title_name, title_units, latex_label))
 
         fig.colorbar(plot)
 
