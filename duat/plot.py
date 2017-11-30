@@ -496,9 +496,10 @@ class Diagnostic:
             rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
                                images with large amount of data exported to PDF might challenging to handle.
             contour_plot (bool): Whether contour lines are plot instead of the density map.
-            z_min (float): Minimum value for the colormap. If None it is automatically set.
-            z_max (float): Maximum value for the colormap. If None it is automatically set.
-            
+            z_max (float): Maximum value for the colormap in log scale. If None it is automatically set to the maximum. 
+            z_min (float): Maximum value for the colormap in log scale. If None it is automatically set to the minimum,
+                           unless z_max/z_min>1E9, then z_min will be set to zmax/1E9 to allow the scale to be shown.
+                           
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`): Objects representing the generated plot.
     
@@ -563,10 +564,11 @@ class Diagnostic:
             if log_map:
                 # Mask manually to prevent a UserWarning
                 masked_z = np.ma.masked_where(z <= 0, z)
-                if z_min is None:
-                    z_min = masked_z.min()
                 if z_max is None:
                     z_max = masked_z.max()
+                if z_min is None:
+                    z_min = masked_z.min()
+                    z_min = max(z_min, z_max/1E9)
                 if rasterized:
                     plot = ax.pcolormesh(axis["LIST"], time_list, masked_z, norm=LogNorm(vmin=z_min, vmax=z_max),
                                          cmap=cmap, zorder=-9)
@@ -627,8 +629,9 @@ class Diagnostic:
             rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
                                images with large amount of data exported to PDF might challenging to handle.
             contour_plot (bool): Whether contour lines are plot instead of the density map.
-            z_min (float): Minimum value for the colormap. If None it is automatically set.
-            z_max (float): Maximum value for the colormap. If None it is automatically set.
+            z_max (float): Maximum value for the colormap in log scale. If None it is automatically set to the maximum. 
+            z_min (float): Maximum value for the colormap in log scale. If None it is automatically set to the minimum,
+                           unless z_max/z_min>1E9, then z_min will be set to zmax/1E9 to allow the scale to be shown.
 
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`): Objects representing the generated plot.
@@ -697,10 +700,11 @@ class Diagnostic:
             if log_map:
                 # Mask manually to prevent a UserWarning
                 masked_z = np.ma.masked_where(z <= 0, z)
-                if z_min is None:
-                    z_min = masked_z.min()
                 if z_max is None:
                     z_max = masked_z.max()
+                if z_min is None:
+                    z_min = masked_z.min()
+                    z_min = max(z_min, z_max/1E9)
                 if rasterized:
                     plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
                                          norm=LogNorm(vmin=z_min, vmax=z_max),
@@ -763,8 +767,9 @@ class Diagnostic:
                             displayed in the bar, use the z_min or z_max parameters to fix it.
             rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
                                images with large amount of data exported to PDF might challenging to handle.
-            z_min (float): Minimum value for the colormap. If None it is automatically set.
-            z_max (float): Maximum value for the colormap. If None it is automatically set.
+            z_max (float): Maximum value for the colormap in log scale. If None it is automatically set to the maximum. 
+            z_min (float): Maximum value for the colormap in log scale. If None it is automatically set to the minimum,
+                           unless z_max/z_min>1E9, then z_min will be set to zmax/1E9 to allow the scale to be shown.
 
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`, `matplotlib.animation.FuncAnimation`):
@@ -807,10 +812,11 @@ class Diagnostic:
         if log_map:
             # Mask manually to prevent a UserWarning
             masked_z = np.ma.masked_where(z <= 0, z)
-            if z_min is None:
-                z_min = masked_z.min()
             if z_max is None:
                 z_max = masked_z.max()
+            if z_min is None:
+                z_min = masked_z.min()
+                z_min = max(z_min, z_max / 1E9)
             if rasterized:
                 plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
                                      norm=LogNorm(vmin=z_min, vmax=z_max),
