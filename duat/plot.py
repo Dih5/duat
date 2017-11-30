@@ -688,6 +688,8 @@ class Diagnostic:
 
         time_list = self.get_time_list(time_selector)
 
+        if len(time_list) == 0:
+            raise ValueError("No time snapshot selected")
         if len(time_list) != 1:
             raise ValueError("A single time snapshot must be selected for this plot")
 
@@ -842,8 +844,8 @@ class Diagnostic:
         z = np.transpose(np.asarray(next(gen)))
 
         time_list = self.get_time_list(time_selector)
-        if len(time_list) == 1:
-            raise ValueError("A single time snapshot cannot make an animation!")
+        if len(time_list) < 2:
+            raise ValueError("At least two time snapshots are needed to make an animation")
 
         # Although pcolormesh works with the rasterize option, the tricky method can also be used
         if log_map:
