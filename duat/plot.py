@@ -849,7 +849,11 @@ class Diagnostic:
                 logger.warning("Tried to add a frame to the animation, but all data was used.")
                 return
             label = 't = {0}'.format(time_list[i])
-            plot.set_array(new_dataset.ravel())
+            # BEWARE: The set_array syntax is rather problematic. Depending on the shading used in pcolormesh, the
+            #         following might not work.
+            plot.set_array(new_dataset[:-1, :-1].ravel())
+            # For more details, check lumbric's answer to
+            # https://stackoverflow.com/questions/18797175/animation-with-pcolormesh-routine-in-matplotlib-how-do-i-initialize-the-data
             ax.set_title(label)
             return plot, ax
 
