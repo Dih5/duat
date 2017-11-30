@@ -18,12 +18,13 @@ API documentation:
    data.rst
 
 
-Cookbook:
+Cookbook and information:
 
 .. toctree::
    :maxdepth: 2
 
    cookbook.md
+   structure.md
 
 
 
