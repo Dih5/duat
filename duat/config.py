@@ -133,6 +133,10 @@ class Section(MetaSection):
         for key in kwargs:
             self.pars[key] = kwargs[key]
 
+    def remove_par(self, name):
+        """Remove the given parameter from the Section"""
+        self.pars.pop(name)
+
     def to_fortran(self):
         s = self.name + "\n{\n"
         for p in self.pars:
@@ -306,6 +310,10 @@ class SectionOrdered(MetaSection):
             else:
                 self.subsections[name] = section
                 self.order.append(name)
+
+    def remove_section(self, name):
+        """Remove the section with the given name"""
+        self.subsections.pop(name)
 
     def to_fortran(self):
         s = ("!---" + self.label + "\n") if self.label else ""
