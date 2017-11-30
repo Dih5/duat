@@ -245,7 +245,9 @@ class Diagnostic:
 
         if axes_selector is not None:
             if len(axes_selector) != len(self.axes):
-                raise ValueError("Invalid axes_selector parameter. Length must be %d. Check the axes of the Diagnostic instance." % len(self.axes))
+                raise ValueError(
+                    "Invalid axes_selector parameter. Length must be %d. Check the axes of the Diagnostic instance." % len(
+                        self.axes))
 
             def f_axes_selector(x):
                 offset = 1 if multiple_datasets else 0  # If multiple dataset, do not count its axis for reduction
@@ -298,7 +300,9 @@ class Diagnostic:
 
         if axes_selector is not None:
             if len(axes_selector) != len(self.axes):
-                raise ValueError("Invalid axes_selector parameter. Length must be %d. Check the axes of the Diagnostic instance." % len(self.axes))
+                raise ValueError(
+                    "Invalid axes_selector parameter. Length must be %d. Check the axes of the Diagnostic instance." % len(
+                        self.axes))
             for i, sel in enumerate(axes_selector):
                 if sel is None:
                     axes.append(self.axes[i])
@@ -572,7 +576,6 @@ class Diagnostic:
                     z_min = masked_z.min()
                 if z_max is None:
                     z_max = masked_z.max()
-                # TODO: Sometimes z_min is not an interesting value. Perhaps add a parameter to set it.
                 if rasterized:
                     plot = ax.pcolormesh(axis["LIST"], time_list, masked_z, norm=LogNorm(vmin=z_min, vmax=z_max),
                                          cmap=cmap, zorder=-9)
@@ -603,6 +606,317 @@ class Diagnostic:
             plt.close()
 
         return fig, ax
+
+    def axes_2d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
+                         dpi=200, latex_label=True, cmap=None, log_map=False, show=True, rasterized=True,
+                         contour_plot=False, z_min=None, z_max=None):
+        """
+        Generate a colormap in two axes.
+        
+        A single time snapshot must be selected with the time_selector parameter. For an animated version in time see 
+        the :func:`~duat.osiris.plot.Diagnostic.time_2d_animation` method.
+
+
+        Note:
+            For simple manipulation like labels or title you can make use of the returned tuple or a
+            `matplotlib.pyplot.style.context`. More advanced manipulation can be done extracting the data with the
+            :func:`~duat.osiris.plot.Diagnostic.get_generator` method instead.
+
+        Args:
+            output_path (str): The place where the plot is saved. If "" or None, the figure is not saved.
+            dataset_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            axes_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            time_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            dpi (int): The resolution of the file in dots per inch.
+            latex_label (bool): Whether for use LaTeX code for the plot.
+            cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
+            log_map (bool): Whether the map is plot in log scale. If the log scale is too wide and values are not
+                            displayed in the bar, use the z_min or z_max parameters to fix it.
+            show (bool): Whether to show the plot. This is blocking if matplotlib is in non-interactive mode.
+            rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
+                               images with large amount of data exported to PDF might challenging to handle.
+            contour_plot (bool): Whether contour lines are plot instead of the density map.
+            z_min (float): Minimum value for the colormap. If None it is automatically set.
+            z_max (float): Maximum value for the colormap. If None it is automatically set.
+
+        Returns:
+            (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`): Objects representing the generated plot.
+
+        """
+        if output_path:
+            ensure_dir_exists(os.path.dirname(output_path))
+        axes = self.get_axes(dataset_selector=dataset_selector, axes_selector=axes_selector)
+        if len(axes) != 2:
+            raise ValueError("Expected 2 axes plot, but %d were provided" % len(axes))
+
+        gen = self.get_generator(dataset_selector=dataset_selector, axes_selector=axes_selector,
+                                 time_selector=time_selector)
+
+        # Set plot labels
+        fig, ax = plt.subplots()
+
+        x_name = axes[0]["LONG_NAME"]
+        x_units = axes[0]["UNITS"]
+        y_name = axes[1]["LONG_NAME"]
+        y_units = axes[1]["UNITS"]
+        title_name = self.data_name
+        title_units = self.units
+
+        if latex_label:
+            if x_units:
+                x_units = "$" + _improve_latex(x_units) + "$"
+            if y_units:
+                y_units = "$" + _improve_latex(y_units) + "$"
+            if title_units:
+                title_units = "$" + _improve_latex(title_units) + "$"
+            # Names might be text or LaTeX. Try to guess
+            if _is_latex(x_name):
+                x_name = "$" + _improve_latex(x_name) + "$"
+            if _is_latex(y_name):
+                y_name = "$" + _improve_latex(y_name) + "$"
+            if _is_latex(title_name):
+                title_name = "$" + _improve_latex(title_name) + "$"
+
+        if x_units:
+            ax.set_xlabel("%s (%s)" % (x_name, x_units))
+        else:
+            ax.set_xlabel("%s" % (x_name,))
+        if y_units:
+            ax.set_ylabel("%s (%s)" % (y_name, y_units))
+        else:
+            ax.set_ylabel("%s" % (y_name,))
+
+        time_list = self.get_time_list(time_selector)
+
+        if len(time_list) != 1:
+            raise ValueError("A single time snapshot must be selected for this plot")
+
+        # Gather the points
+        x_min, x_max = axes[0]["MIN"], axes[0]["MAX"]
+        y_min, y_max = axes[1]["MIN"], axes[1]["MAX"]
+        z = np.transpose(np.asarray(list(gen)[0]))
+
+        # Options are different for contourf and pcolormesh methods. If the number of cases to distinguish increases
+        # procedurally build the call instead of further adding if clauses.
+
+        if contour_plot:
+            # Rasterizing in contourf is a bit tricky
+            # Cf. http://stackoverflow.com/questions/33250005/size-of-matplotlib-contourf-image-files
+            if log_map:
+                # Mask manually to prevent a UserWarning
+                if rasterized:
+                    plot = ax.contourf(axes[0]["LIST"], axes[1]["LIST"], np.ma.masked_where(z <= 0, z),
+                                       locator=ticker.LogLocator(), cmap=cmap, zorder=-9)
+                    ax.set_rasterization_zorder(-1)
+                else:
+                    plot = ax.contourf(axes[0]["LIST"], axes[1]["LIST"], np.ma.masked_where(z <= 0, z),
+                                       locator=ticker.LogLocator(), cmap=cmap)
+            else:
+                if rasterized:
+                    plot = ax.contourf(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap, zorder=-9)
+                    ax.set_rasterization_zorder(-1)
+                else:
+                    plot = ax.contourf(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap)
+        else:
+            # Although pcolormesh works with the rasterize option, the tricky method can also be used
+            if log_map:
+                # Mask manually to prevent a UserWarning
+                masked_z = np.ma.masked_where(z <= 0, z)
+                if z_min is None:
+                    z_min = masked_z.min()
+                if z_max is None:
+                    z_max = masked_z.max()
+                if rasterized:
+                    plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
+                                         norm=LogNorm(vmin=z_min, vmax=z_max),
+                                         cmap=cmap, zorder=-9)
+                    ax.set_rasterization_zorder(-1)
+                else:
+                    plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
+                                         norm=LogNorm(vmin=z_min, vmax=z_max),
+                                         cmap=cmap)
+            else:
+                if rasterized:
+                    plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap, zorder=-9)
+                    ax.set_rasterization_zorder(-1)
+                else:
+                    plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap)
+
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
+
+        ax.set_title("%s (%s)" % (title_name, title_units))
+
+        fig.colorbar(plot)
+
+        if output_path:  # "" or None
+            plt.savefig(output_path, dpi=dpi)
+
+        if show:
+            plt.show()
+        else:
+            plt.close()
+
+        return fig, ax
+
+    def time_2d_animation(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
+                          dpi=200, fps=1, cmap=None, log_map=False, rasterized=True, z_min=None,
+                          z_max=None, latex_label=True, interval=200):
+        """
+        Generate a plot of 2d data as a color map which animated in time.
+
+        If an output path with a suitable extension is supplied, the method will export it. Available formats are mp4
+        and gif. The returned objects allow for minimal customization and representation. For example in Jupyter you
+        might use `IPython.display.HTML(animation.to_html5_video())`, where `animation` is the returned `FuncAnimation`
+        instance.
+
+        Note:
+            Exporting a high resolution animated gif with many frames might eat your RAM.
+
+        Args:
+            output_path (str): The place where the plot is saved. If "" or None, the plot is shown in matplotlib.
+            dataset_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            axes_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            time_selector: See :func:`~duat.osiris.plot.Diagnostic.get_generator` method.
+            interval (float): Delay between frames in ms. If exporting to mp4, the fps is used instead to generate the
+                              file, although the returned objects do use this value.
+            dpi (int): The resolution of the frames in dots per inch (only if exporting).
+            fps (int): The frames per seconds (only if exporting to mp4).
+            latex_label (bool): Whether for use LaTeX code for the plot.
+            cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
+            log_map (bool): Whether the map is plot in log scale. If the log scale is too wide and values are not
+                            displayed in the bar, use the z_min or z_max parameters to fix it.
+            rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
+                               images with large amount of data exported to PDF might challenging to handle.
+            z_min (float): Minimum value for the colormap. If None it is automatically set.
+            z_max (float): Maximum value for the colormap. If None it is automatically set.
+
+        Returns:
+            (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`, `matplotlib.animation.FuncAnimation`):
+            Objects representing the generated plot and its animation.
+
+        """
+        if output_path:
+            ensure_dir_exists(os.path.dirname(output_path))
+        axes = self.get_axes(dataset_selector=dataset_selector, axes_selector=axes_selector)
+        if len(axes) != 2:
+            raise ValueError("Expected 2 axes plot, but %d were provided" % len(axes))
+
+        gen = self.get_generator(dataset_selector=dataset_selector, axes_selector=axes_selector,
+                                 time_selector=time_selector)
+
+        # Set plot labels
+        fig, ax = plt.subplots()
+        fig.set_tight_layout(True)
+
+        x_name = axes[0]["LONG_NAME"]
+        x_units = axes[0]["UNITS"]
+        y_name = axes[1]["LONG_NAME"]
+        y_units = axes[1]["UNITS"]
+        title_name = self.data_name
+        title_units = self.units
+
+        if latex_label:
+            if x_units:
+                x_units = "$" + _improve_latex(x_units) + "$"
+            if y_units:
+                y_units = "$" + _improve_latex(y_units) + "$"
+            # Names might be text or LaTeX. Try to guess
+            if _is_latex(x_name):
+                x_name = "$" + _improve_latex(x_name) + "$"
+            if _is_latex(y_name):
+                y_name = "$" + _improve_latex(y_name) + "$"
+
+        if x_units:
+            ax.set_xlabel("%s (%s)" % (x_name, x_units))
+        else:
+            ax.set_xlabel("%s" % (x_name,))
+        if y_units:
+            ax.set_ylabel("%s (%s)" % (y_name, y_units))
+        else:
+            ax.set_ylabel("%s" % (y_name,))
+
+        # Gather the points
+        x_min, x_max = axes[0]["MIN"], axes[0]["MAX"]
+        y_min, y_max = axes[1]["MIN"], axes[1]["MAX"]
+        z = np.transpose(np.asarray(next(gen)))
+
+        time_list = self.get_time_list(time_selector)
+        if len(time_list) == 1:
+            raise ValueError("A single time snapshot cannot make an animation!")
+
+        # Although pcolormesh works with the rasterize option, the tricky method can also be used
+        if log_map:
+            # Mask manually to prevent a UserWarning
+            masked_z = np.ma.masked_where(z <= 0, z)
+            if z_min is None:
+                z_min = masked_z.min()
+            if z_max is None:
+                z_max = masked_z.max()
+            if rasterized:
+                plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
+                                     norm=LogNorm(vmin=z_min, vmax=z_max),
+                                     cmap=cmap, zorder=-9)
+                ax.set_rasterization_zorder(-1)
+            else:
+                plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
+                                     norm=LogNorm(vmin=z_min, vmax=z_max),
+                                     cmap=cmap)
+        else:
+            if rasterized:
+                plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap, zorder=-9)
+                ax.set_rasterization_zorder(-1)
+            else:
+                plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap)
+
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(y_min, y_max)
+
+        ax.set_title("%s (%s)" % (title_name, title_units))
+
+        fig.colorbar(plot)
+
+        # Prepare a function for the updates
+        def update(i):
+            """Update the plot, returning the artists which must be redrawn."""
+            try:
+                new_dataset = np.transpose(np.asarray(next(gen)))
+            except StopIteration:
+                logger.warning("Tried to add a frame to the animation, but all data was used.")
+                return
+            label = 't = {0}'.format(time_list[i])
+            plot.set_array(new_dataset.ravel())
+            ax.set_title(label)
+            return plot, ax
+
+        anim = FuncAnimation(fig, update, frames=range(1, len(time_list) - 2), interval=interval)
+
+        if not output_path:  # "" or None
+            pass
+        else:
+            filename = os.path.basename(output_path)
+            if "." in filename:
+                extension = output_path.split(".")[-1].lower()
+            else:
+                extension = None
+            if extension == "gif":
+                anim.save(output_path, dpi=dpi, writer='imagemagick')
+            elif extension == "mp4":
+                metadata = dict(title=os.path.split(self.data_path)[-1], artist='duat', comment=self.data_path)
+                writer = FFMpegWriter(fps=fps, metadata=metadata)
+                with writer.saving(fig, output_path, dpi):
+                    # Iterate over frames
+                    for i in range(1, len(time_list) - 1):
+                        update(i)
+                        writer.grab_frame()
+                    # Keep showing the last frame for the fixed time
+                    writer.grab_frame()
+            else:
+                logger.warning("Unknown extension in path %s. No output produced." % output_path)
+
+        plt.close()
+
+        return fig, ax, anim
 
 
 def get_diagnostic_list(run_dir="."):
