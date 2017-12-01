@@ -7,6 +7,7 @@ from __future__ import division
 from glob import glob
 import os
 import re
+from math import floor
 
 import h5py
 import numpy as np
@@ -210,6 +211,9 @@ class Diagnostic:
             raise TypeError("Unknown dataset type: %s", type(dataset_key))
         return dataset_key
 
+    def _scaled_slice_to_slice(self, scaled_slice):
+        return scaled_slice._get_slice(self.t_0, self.dt * len(self.snapshot_list), len(self.snapshot_list))
+
     def get_generator(self, dataset_selector=None, axes_selector=None, time_selector=None):
         """
         Get a generator providing data from the file.
@@ -235,7 +239,9 @@ class Diagnostic:
                     * callable (default): Reduce the data along this axes using the given function (e.g., mean, max, sum...).
 
 
-            time_selector (slice): A slice instance selecting the points in time to take.
+            time_selector (slice or ScaledSlice): A slice or ScaledSlice instance selecting the points in time to take.
+                A slice selects times from the list returned by :func:`~duat.osiris.plot.Diagnostic.get_time_list`.
+                A ScaledSlice chooses a slice that best represents a choice in terms of time units.
 
         Returns:
             generator: A generator which provides the data.
@@ -289,9 +295,12 @@ class Diagnostic:
             def f_axes_selector(x):
                 return x
 
-        if time_selector is not None and not isinstance(time_selector, slice):
-            logger.warning("Invalid time_selector parameter ignored. Use a slice instead.")
-            time_selector = None
+        if time_selector is not None:
+            if isinstance(time_selector, ScaledSlice):
+                time_selector = self._scaled_slice_to_slice(time_selector)
+            elif not isinstance(time_selector, slice):
+                logger.warning("Invalid time_selector parameter ignored. Use a slice or a ScaledSlice instead.")
+                time_selector = None
 
         def gen():
             for file_name in (self.file_list[time_selector] if time_selector else self.file_list):
@@ -349,8 +358,13 @@ class Diagnostic:
 
         """
         if time_selector:
-            # This could be improved to avoid generating unneeded values
-            return [self.t_0 + self.dt * i for i in self.snapshot_list][time_selector]
+            if isinstance(time_selector, slice):
+                # This could be improved to avoid generating unneeded values
+                return [self.t_0 + self.dt * i for i in self.snapshot_list][time_selector]
+            elif isinstance(time_selector, ScaledSlice):
+                return self.get_time_list(self._scaled_slice_to_slice(time_selector))
+            else:
+                raise TypeError("time_selector must be a slice or a ScaledSlice")
         else:
             return [self.t_0 + self.dt * i for i in self.snapshot_list]
 
@@ -568,7 +582,7 @@ class Diagnostic:
                     z_max = masked_z.max()
                 if z_min is None:
                     z_min = masked_z.min()
-                    z_min = max(z_min, z_max/1E9)
+                    z_min = max(z_min, z_max / 1E9)
                 if rasterized:
                     plot = ax.pcolormesh(axis["LIST"], time_list, masked_z, norm=LogNorm(vmin=z_min, vmax=z_max),
                                          cmap=cmap, zorder=-9)
@@ -704,7 +718,7 @@ class Diagnostic:
                     z_max = masked_z.max()
                 if z_min is None:
                     z_min = masked_z.min()
-                    z_min = max(z_min, z_max/1E9)
+                    z_min = max(z_min, z_max / 1E9)
                 if rasterized:
                     plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
                                          norm=LogNorm(vmin=z_min, vmax=z_max),
@@ -905,3 +919,61 @@ def get_diagnostic_list(run_dir="."):
         if not dirs and files:  # Terminal directory with files in it
             diagnostic_list.append(Diagnostic(root))
     return diagnostic_list
+
+
+def _pos_in_bin(x, a, b, n):
+    """Find the bin where x is found in a mesh from a to b with n points (including both).
+    The index starts at 0 and if x is in the mesh the interval to the right will be returned.
+    The returned value can be outside [0, n-1] if x is not in [a, b).
+    Note that for x=b, the returned value is n"""
+    return floor((x - a) / (b - a) * n)
+
+
+class ScaledSlice:
+    """
+    A slice described in simulation units (instead of list position).
+    
+    This object can be used to describe a time_selector parameter.
+        
+    """
+
+    def __init__(self, start, stop, step=None):
+        """
+        Create a ScaledSlice instance.
+        
+        Args:
+            start(float): Where the slice should start. Actual start will be before if needed. 
+            stop(float): Where the slice should stop. The point is in general excluded, as usual in Python.
+            step (float): The desired step of the slice. Actual step will be the biggest multiple of the mesh step which
+                          is less than this one.
+            
+        """
+        self.start = start
+        self.stop = stop
+        self.step = step
+
+    def __repr__(self):
+        if self.step:
+            return "ScaledSlice<(%g, %g, %g)>" % (self.start, self.stop, self.step)
+        else:
+            return "ScaledSlice<(%g, %g)>" % (self.start, self.stop)
+
+    def _get_slice(self, mesh_min, mesh_max, n_points):
+        """Return a slice best approximating the instance in the given partition"""
+        a = _pos_in_bin(self.start, mesh_min, mesh_max, n_points)
+        if a < 0:
+            a = 0
+        if a >= n_points:
+            a = n_points - 1
+        b = _pos_in_bin(self.stop, mesh_min, mesh_max, n_points)
+        if b < 0:
+            b = 0
+        if b >= n_points:
+            b = n_points - 1
+        if self.step:
+            c = floor(self.step / ((mesh_max - mesh_min) / n_points))
+            if c < 1:
+                c = 1
+            return slice(a, b, c)
+        else:
+            return slice(a, b)
