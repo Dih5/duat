@@ -449,6 +449,11 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
             for f in files:
                 logger.warning("Could not remove file %s" % f)
 
+    # If the run is restartable, make the if_restart variable explicit
+    if "restart" in config and "ndump_fac" in config["restart"] and config["restart"]["ndump_fac"]:
+        if "if_restart" not in config["restart"]:
+            config["restart"]["if_restart"] = False  # This is the default value
+
     # copy the input file
     ensure_dir_exists(run_dir)
     config.write(path.join(run_dir, "os-stdin"))
@@ -461,8 +466,15 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
 
     # Create a start.sh file to ease manual launch
     with open(path.join(run_dir, "start.sh"), 'w') as f:
-        f.write("./osiris > out.txt 2> err.txt")
+        f.write("#!/bin/bash\n./osiris > out.txt 2> err.txt")
     ensure_executable(path.join(run_dir, "start.sh"))
+
+    # Create a continue.sh file to ease manual relaunch of aborted executions
+    with open(path.join(run_dir, "continue.sh"), 'w') as f:
+        f.write("#!/bin/bash"
+                "\nsed -i -e \"s/if_restart = .false./if_restart = .true./g\" os-stdin"
+                "\n./osiris >> out.txt 2>> err.txt")
+    ensure_executable(path.join(run_dir, "continue.sh"))
 
     if mpcaller is not None:
         run = Run(run_dir)
@@ -498,7 +510,7 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
         run_dir (str): Folder where the run will be carried.
         run_name (str): Name of the job in the engine.
         remote_dir (str): If provided, a remote directory where the run will be carried, which might be only available
-                          in the node selected by the engine. Note hat if this option is used, the returned Run objects
+                          in the node selected by the engine. Note that if this option is used, the returned Run objects
                           will not access the remote_dir, but the run_dir.
         clean_dir (bool): Whether to remove the files in the directory before execution.
 
