@@ -103,12 +103,13 @@ class Run:
         run_dir (str): Directory where the run takes place.
         total_steps (int): Amount of time steps in the simulation.
         running_mode (str): Can be "local" if a local process was found, "grid" if a grid job was found, or ""
-                            otherwise. A simulation launch in the grid but running in the local machine will be "local".
+                            otherwise. A simulation launch in the grid but running in the local machine will be tagged
+                            as "local" (since you can access its process).
         process (psutil.Process): If running_mode is "local", representation of the process running the simulation.
         job (dict): If running_mode is "grid", information about the job of the simulation.
         
     Notes:
-        Only single-process runs are supported at the moment. Resuming runs are neither supported yet.
+        Only single-process runs are supported at the moment.
         
     """
 
@@ -144,25 +145,57 @@ class Run:
         self.process = None
         self.job = None
 
-        self.update()
+        self._update()
 
-    def __repr__(self):
-        if self.is_running():
-            return "Run<%s [RUNNING (%s/%d)]>" % (self._run_dir_name, self.current_step(), self.total_steps)
-        elif self.has_error():
+    def get_status(self):
+        """
+        Return the status of the run.
+
+        Returns:
+            str: The status of the run. Possible values are:
+
+                * "RUNNING": Either a process is running the simulation (running_mode="local") or a qstat job was found (running_mode="grid").
+                * "FAILED": An error was detected in the OSIRIS output.
+                * "FINISHED": The simulation has successfully finished its execution.
+                * "INCOMPLETE": The simulation appears to have started but not running now. You should check the output to try to understand what happened. If restart information was sent, you might want to run "continue.sh" to resume the simulation.
+                * "NOT STARTED": The files were created, but the simulation is not running. Note you will see this state if the Run is queued in a MPCaller instance.
+
+        """
+        if self._is_running():
+            return "RUNNING"
+        elif self._has_error():
             # The run started but failed
-            return "Run<%s [FAILED]>" % (self._run_dir_name,)
-        elif self.is_finished():
+            return "FAILED"
+        elif self._is_finished():
             # The run was finished
-            return "Run<%s> [FINISHED]" % (self._run_dir_name,)
+            return "FINISHED"
         elif self.current_step() >= 0:
             # The run started at some point but was not completed
-            return "Run<%s> [INCOMPLETE (%s/%d)]" % (self._run_dir_name, self.current_step(), self.total_steps)
+            return "INCOMPLETE"
         else:
             # The run did not start
-            return "Run<%s> [NOT STARTED]" % (self._run_dir_name,)
+            return "NOT STARTED"
 
-    def update(self):
+    def __repr__(self):
+        status = self.get_status()
+        if status == "RUNNING":
+            return "Run<%s [RUNNING (%s/%d)]>" % (self._run_dir_name, self.current_step(), self.total_steps)
+        elif status == "FAILED":
+            # The run started but failed
+            return "Run<%s [FAILED]>" % (self._run_dir_name,)
+        elif status == "FINISHED":
+            # The run was finished
+            return "Run<%s> [FINISHED]" % (self._run_dir_name,)
+        elif status == "INCOMPLETE":
+            # The run started at some point but was not completed
+            return "Run<%s> [INCOMPLETE (%s/%d)]" % (self._run_dir_name, self.current_step(), self.total_steps)
+        elif status == "NOT STARTED":
+            # The run did not start
+            return "Run<%s> [NOT STARTED]" % (self._run_dir_name,)
+        else:
+            return "Run<%s> [???]" % (self._run_dir_name,)
+
+    def _update(self):
         """Update the process info using what is found at the moment."""
         candidates = _find_running_exe(path.join(self.run_dir, "osiris"))
 
@@ -228,19 +261,38 @@ class Run:
         else:
             return -1
 
-    def is_running(self):
+    def _is_running(self):
         """Return True if the simulation is known to be running, or False otherwise."""
-        self.update()
+        # Public interface is given by get_status instead.
+        self._update()
         return True if self.running_mode else False
 
-    def is_finished(self):
-        if self.is_running():  # Which calls update
+    def _is_finished(self):
+        # Public interface is given by get_status instead.
+        if self._is_running():  # Which calls update
             return False
         else:
             if path.isfile(path.join(self.run_dir, "TIMINGS", "timings.001")):
                 return True
             else:
                 return False
+
+    def _has_error(self):
+        """Search for common error messages in the output file."""
+        # Public interface is given by get_status instead.
+        # TODO: Cache result if reached execution with no error
+        try:
+            with open(path.join(self.run_dir, "out.txt"), "r") as f:
+                text = f.read()
+            # TODO: Optimize this search
+            if "(*error*)" in text or re.search("Error reading .* parameters", text) or re.search(
+                    "MPI_ABORT was invoked",
+                    text):
+                return True
+            else:
+                return False
+        except FileNotFoundError:
+            return False
 
     def terminate(self):
         """
@@ -252,7 +304,7 @@ class Run:
             subprocess.CalledProcessError: If using a grid and qdel fails.
 
         """
-        self.update()
+        self._update()
         if self.running_mode == "local":
             try:
                 self.process.terminate()
@@ -277,7 +329,7 @@ class Run:
             subprocess.CalledProcessError: If using a grid and qdel fails.
 
         """
-        self.update()
+        self._update()
         if self.running_mode == "local":
             try:
                 self.process.kill()
@@ -301,9 +353,9 @@ class Run:
             float: The estimation of the time to end the simulation or NaN if no estimation could be done.
 
         """
-        self.update()
+        self._update()
         if not self.running_mode:
-            return 0 if self.is_finished() else float("nan")
+            return 0 if self._is_finished() else float("nan")
         elif self.running_mode == "local":
             start = self.process.create_time()
         elif self.running_mode == "grid":
@@ -337,22 +389,6 @@ class Run:
     def get_size(self):
         """Get the size of all run data in bytes."""
         return get_dir_size(self.run_dir)
-
-    def has_error(self):
-        """Search for common error messages in the output file."""
-        # TODO: Cache result if reached execution with no error
-        try:
-            with open(path.join(self.run_dir, "out.txt"), "r") as f:
-                text = f.read()
-            # TODO: Optimize this search
-            if "(*error*)" in text or re.search("Error reading .* parameters", text) or re.search(
-                    "MPI_ABORT was invoked",
-                    text):
-                return True
-            else:
-                return False
-        except FileNotFoundError:
-            return False
 
     def get_diagnostic_list(self):
         """
@@ -495,7 +531,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         run = Run(run_dir)
 
         # Try to detect errors checking the output
-        if run.has_error():
+        if run._has_error():
             logger.warning(
                 "Error detected while launching %s.\nCheck out.txt there for more information or re-run in console." % run_dir)
         return run
