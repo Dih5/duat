@@ -99,6 +99,7 @@ class Call:
 
 def _caller(q):
     """Execute calls from a Queue until its value is 'END'."""
+    os.setpgrp()  # To avoid inheriting SIGINT
     while True:
         data = q.get()
         if data == "END":
@@ -120,9 +121,11 @@ class MPCaller:
         self._queue = Queue()
         self.processes = []
         self.spawn_threads(num_threads)
+        self._ends_in_queue = 0
 
     def __repr__(self):
-        return "MPCaller<%d threads, %d tasks in _queue>" % (len(self.processes), self._queue.qsize())
+        return "MPCaller<%d threads, %d tasks in _queue>" % (
+                len(self.processes), self._queue.qsize() - self._ends_in_queue)
 
     def spawn_threads(self, num_threads):
         """Create the required number of processes and add them to the caller.
@@ -160,11 +163,13 @@ class MPCaller:
         num_threads = len(self.processes)
         for _ in range(num_threads):
             self._queue.put("END")
+            self._ends_in_queue += 1
 
         if blocking:
             for t in self.processes:
                 t.join()
             self.processes = []
+            self._ends_in_queue = 0
             if respawn:
                 self.spawn_threads(num_threads)
 
@@ -176,19 +181,24 @@ class MPCaller:
             interrupt: If True, terminate all processes.
 
         """
-        for _ in range(len(self.processes)+1):
+        for _ in range(len(self.processes) + 1):
             self._queue.put("END")
+            self._ends_in_queue += 1
         while True:
+            # Consume all calls in queue
             data = self._queue.get()
             if data == "END":
+                # If we consumed an END (we probably will), put it back
+                self._queue.put("END")
                 break
-            # Else do nothing
+                # Otherwise do nothing
         if interrupt:
             for t in self.processes:
                 t.terminate()
             # If the killed process was trying to use the Queue it could have corrupted
             # Just in case, create a new one
             self._queue = Queue()
+            self._ends_in_queue = 0
 
 
 def tail(path, lines=1, _step=4098):
