@@ -401,6 +401,9 @@ class Diagnostic:
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`, `matplotlib.animation.FuncAnimation`):
             Objects representing the generated plot and its animation.
+            
+        Raises:
+            FileNotFoundError: If tried to export to mp4 but ffmpeg is not found in the system.
 
         """
         if output_path:
@@ -788,6 +791,9 @@ class Diagnostic:
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`, `matplotlib.animation.FuncAnimation`):
             Objects representing the generated plot and its animation.
+            
+        Raises:
+            FileNotFoundError: If tried to export to mp4 but ffmpeg is not found in the system.
 
         """
         if output_path:
