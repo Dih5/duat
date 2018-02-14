@@ -124,6 +124,9 @@ class Section(MetaSection):
     def __setitem__(self, key, value):
         self.pars[key] = value
 
+    def __contains__(self, key):
+        return key in self.pars
+
     def set_par(self, name, val):
         """Add or update the value of a parameter"""
         self.pars[name] = val
@@ -295,6 +298,9 @@ class SectionOrdered(MetaSection):
     def __iter__(self):
         for x in self.order:
             yield x
+
+    def __contains__(self, key):
+        return key in self.subsections
 
     def set_section(self, name, section=None):
         """ Add or replace a section."""
