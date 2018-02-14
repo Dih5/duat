@@ -51,16 +51,17 @@ def ensure_dir_exists(path):
         OSError: An error occurred when creating the directory.
 
     """
-    try:
-        # Will fail either if exists or unable to create it
-        os.makedirs(path)
-    except OSError:
-        if os.path.exists(path):
-            # Directory did [probably] exist
-            pass
-        else:
-            # There was an error on creation, so make sure we know about it
-            raise OSError("Unable to create directory " + path)
+    if path:  # Empty dir (cwd) always exists
+        try:
+            # Will fail either if exists or unable to create it
+            os.makedirs(path)
+        except OSError:
+            if os.path.exists(path):
+                # Directory did [probably] exist
+                pass
+            else:
+                # There was an error on creation, so make sure we know about it
+                raise OSError("Unable to create directory " + path)
 
 
 def get_dir_size(dir_path):
