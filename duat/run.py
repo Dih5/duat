@@ -282,6 +282,12 @@ class Run:
         # Public interface is given by get_status instead.
         # TODO: Cache result if reached execution with no error
         try:
+            # If there is something in the error file:
+            if path.getsize(path.join(self.run_dir, "err.txt")) > 0:
+                return True
+        except FileNotFoundError:
+            pass
+        try:
             with open(path.join(self.run_dir, "out.txt"), "r") as f:
                 text = f.read()
             # TODO: Optimize this search
