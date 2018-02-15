@@ -395,6 +395,7 @@ class Diagnostic:
 
                 * "expand": The y limits increase when needed, but they don't decrease.
                 * "adjust_always": Always change the y limits to those of the data.
+                * "max": Use the maximum range from the beginning.
 
             latex_label (bool): Whether for use LaTeX code for the plot.
             
@@ -433,6 +434,15 @@ class Diagnostic:
         plot_data, = ax.plot(axis["LIST"], next(gen))
         ax.set_xlim(x_min, x_max)
 
+        if scale_mode == "max":
+            # Get a list (generator) with the mins and maxs in each time step
+            min_max_list = map(lambda l: [min(l), max(l)],
+                               self.get_generator(dataset_selector=dataset_selector, axes_selector=axes_selector,
+                                                  time_selector=time_selector))
+            f = lambda mins, maxs: (min(mins), max(maxs))
+            y_min, y_max = f(*zip(*min_max_list))
+            ax.set_ylim(y_min, y_max)
+
         time_list = self.get_time_list(time_selector)
 
         # Prepare a function for the updates
@@ -446,7 +456,7 @@ class Diagnostic:
             label = 't = {0}'.format(time_list[i])
             plot_data.set_ydata(new_dataset[:])
             ax.set_title(label)
-            if not scale_mode:
+            if not scale_mode or scale_mode == "max":
                 pass
             elif scale_mode == "expand":
                 prev = ax.get_ylim()
