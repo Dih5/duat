@@ -539,7 +539,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         # Try to detect errors checking the output
         if run._has_error():
             logger.warning(
-                "Error detected while launching %s.\nCheck out.txt there for more information or re-run in console." % run_dir)
+                "Error detected while launching %s.\nCheck out.txt and err.txt for more information or re-run in console." % run_dir)
         return run
 
 
