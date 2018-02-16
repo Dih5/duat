@@ -13,7 +13,7 @@ import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-from matplotlib.colors import LogNorm
+import matplotlib.colors as colors
 from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 from duat.common import ensure_dir_exists, human_order_key, MPCaller, Call, logger
@@ -70,6 +70,31 @@ def _create_label(name, units, latex_label=False):
         return "%s (%s)" % (name, units)
     else:
         return name
+
+
+def _autonorm(norm, z):
+    """
+    Automatic options for color plot normalization.
+
+    Args:
+        norm (str or other): Description of the norm.
+        z (matrix of numbers): Data.
+
+    Returns:
+        (`matplotlib.colors.Normalize`): A suitable normalize option (or None)
+
+    """
+    if isinstance(norm, str):
+        norm = norm.lower()
+    if norm == "lin":
+        norm = None
+    if norm == "log":
+        masked_z = np.ma.masked_where(z <= 0, z)
+        z_max = masked_z.max()
+        z_min = masked_z.min()
+        z_min = max(z_min, z_max / 1E9)
+        norm = colors.LogNorm(vmin=z_min, vmax=z_max)
+    return norm
 
 
 class Diagnostic:
@@ -496,8 +521,8 @@ class Diagnostic:
         return fig, ax, anim
 
     def time_1d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
-                         dpi=200, latex_label=True, cmap=None, log_map=False, show=True, rasterized=True,
-                         contour_plot=False, z_min=None, z_max=None):
+                         dpi=200, latex_label=True, cmap=None, norm=None, show=True, rasterized=True,
+                         contour_plot=False):
         """
         Generate a colormap in an axis and the time.
     
@@ -517,15 +542,18 @@ class Diagnostic:
             dpi (int): The resolution of the file in dots per inch.
             latex_label (bool): Whether for use LaTeX code for the plot.
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
-            log_map (bool): Whether the map is plot in log scale. If the log scale is too wide and values are not
-                            displayed in the bar, use the z_min or z_max parameters to fix it.
+            norm (str or `matplotlib.colors.Normalize`): How to scale the colormap. For advanced manipulation, use some
+                           Normalize subclass, e.g., colors.SymLogNorm(0.01). Automatic scales can be selected with
+                           the following strings:
+
+                           * "lin": Linear scale from minimum to maximum.
+                           * "log": Logarithmic scale from minimum to maximum up to vmax/vmin>1E9, otherwise increasing vmin.
+
+
             show (bool): Whether to show the plot. This is blocking if matplotlib is in non-interactive mode.
             rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
                                images with large amount of data exported to PDF might challenging to handle.
             contour_plot (bool): Whether contour lines are plot instead of the density map.
-            z_max (float): Maximum value for the colormap in log scale. If None it is automatically set to the maximum. 
-            z_min (float): Maximum value for the colormap in log scale. If None it is automatically set to the minimum,
-                           unless z_max/z_min>1E9, then z_min will be set to zmax/1E9 to allow the scale to be shown.
                            
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`): Objects representing the generated plot.
@@ -565,50 +593,16 @@ class Diagnostic:
         x_min, x_max = axis["MIN"], axis["MAX"]
         z = np.asarray(list(gen))
 
-        # Options are different for contourf and pcolormesh methods. If the number of cases to distinguish increases
-        # procedurally build the call instead of further adding if clauses.
+        norm = _autonorm(norm, z)
 
-        if contour_plot:
+        plot_function = ax.contourf if contour_plot else ax.pcolormesh
+        if rasterized:
             # Rasterizing in contourf is a bit tricky
             # Cf. http://stackoverflow.com/questions/33250005/size-of-matplotlib-contourf-image-files
-            if log_map:
-                # Mask manually to prevent a UserWarning
-                if rasterized:
-                    plot = ax.contourf(axis["LIST"], time_list, np.ma.masked_where(z <= 0, z),
-                                       locator=ticker.LogLocator(), cmap=cmap, zorder=-9)
-                    ax.set_rasterization_zorder(-1)
-                else:
-                    plot = ax.contourf(axis["LIST"], time_list, np.ma.masked_where(z <= 0, z),
-                                       locator=ticker.LogLocator(), cmap=cmap)
-            else:
-                if rasterized:
-                    plot = ax.contourf(axis["LIST"], time_list, z, cmap=cmap, zorder=-9)
-                    ax.set_rasterization_zorder(-1)
-                else:
-                    plot = ax.contourf(axis["LIST"], time_list, z, cmap=cmap)
+            plot = plot_function(axis["LIST"], time_list, z, norm=norm, cmap=cmap, zorder=-9)
+            ax.set_rasterization_zorder(-1)
         else:
-            # Although pcolormesh works with the rasterize option, the tricky method can also be used
-            if log_map:
-                # Mask manually to prevent a UserWarning
-                masked_z = np.ma.masked_where(z <= 0, z)
-                if z_max is None:
-                    z_max = masked_z.max()
-                if z_min is None:
-                    z_min = masked_z.min()
-                    z_min = max(z_min, z_max / 1E9)
-                if rasterized:
-                    plot = ax.pcolormesh(axis["LIST"], time_list, masked_z, norm=LogNorm(vmin=z_min, vmax=z_max),
-                                         cmap=cmap, zorder=-9)
-                    ax.set_rasterization_zorder(-1)
-                else:
-                    plot = ax.pcolormesh(axis["LIST"], time_list, masked_z, norm=LogNorm(vmin=z_min, vmax=z_max),
-                                         cmap=cmap)
-            else:
-                if rasterized:
-                    plot = ax.pcolormesh(axis["LIST"], time_list, z, cmap=cmap, zorder=-9)
-                    ax.set_rasterization_zorder(-1)
-                else:
-                    plot = ax.pcolormesh(axis["LIST"], time_list, z, cmap=cmap)
+            plot = plot_function(axis["LIST"], time_list, z, norm=norm, cmap=cmap)
 
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(time_list[0], time_list[-1])
@@ -628,8 +622,8 @@ class Diagnostic:
         return fig, ax
 
     def axes_2d_colormap(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
-                         dpi=200, latex_label=True, cmap=None, log_map=False, show=True, rasterized=True,
-                         contour_plot=False, z_min=None, z_max=None):
+                         dpi=200, latex_label=True, cmap=None, norm=None, show=True, rasterized=True,
+                         contour_plot=False):
         """
         Generate a colormap in two axes.
         
@@ -650,15 +644,18 @@ class Diagnostic:
             dpi (int): The resolution of the file in dots per inch.
             latex_label (bool): Whether for use LaTeX code for the plot.
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
-            log_map (bool): Whether the map is plot in log scale. If the log scale is too wide and values are not
-                            displayed in the bar, use the z_min or z_max parameters to fix it.
+            norm (str or `matplotlib.colors.Normalize`): How to scale the colormap. For advanced manipulation, use some
+                           Normalize subclass, e.g., colors.SymLogNorm(0.01). Automatic scales can be selected with
+                           the following strings:
+
+                           * "lin": Linear scale from minimum to maximum.
+                           * "log": Logarithmic scale from minimum to maximum up to vmax/vmin>1E9, otherwise increasing vmin.
+
+
             show (bool): Whether to show the plot. This is blocking if matplotlib is in non-interactive mode.
             rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
                                images with large amount of data exported to PDF might challenging to handle.
             contour_plot (bool): Whether contour lines are plot instead of the density map.
-            z_max (float): Maximum value for the colormap in log scale. If None it is automatically set to the maximum. 
-            z_min (float): Maximum value for the colormap in log scale. If None it is automatically set to the minimum,
-                           unless z_max/z_min>1E9, then z_min will be set to zmax/1E9 to allow the scale to be shown.
 
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`): Objects representing the generated plot.
@@ -701,52 +698,16 @@ class Diagnostic:
         y_min, y_max = axes[1]["MIN"], axes[1]["MAX"]
         z = np.transpose(np.asarray(list(gen)[0]))
 
-        # Options are different for contourf and pcolormesh methods. If the number of cases to distinguish increases
-        # procedurally build the call instead of further adding if clauses.
+        norm = _autonorm(norm, z)
 
-        if contour_plot:
+        plot_function = ax.contourf if contour_plot else ax.pcolormesh
+        if rasterized:
             # Rasterizing in contourf is a bit tricky
             # Cf. http://stackoverflow.com/questions/33250005/size-of-matplotlib-contourf-image-files
-            if log_map:
-                # Mask manually to prevent a UserWarning
-                if rasterized:
-                    plot = ax.contourf(axes[0]["LIST"], axes[1]["LIST"], np.ma.masked_where(z <= 0, z),
-                                       locator=ticker.LogLocator(), cmap=cmap, zorder=-9)
-                    ax.set_rasterization_zorder(-1)
-                else:
-                    plot = ax.contourf(axes[0]["LIST"], axes[1]["LIST"], np.ma.masked_where(z <= 0, z),
-                                       locator=ticker.LogLocator(), cmap=cmap)
-            else:
-                if rasterized:
-                    plot = ax.contourf(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap, zorder=-9)
-                    ax.set_rasterization_zorder(-1)
-                else:
-                    plot = ax.contourf(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap)
+            plot = plot_function(axes[0]["LIST"], axes[1]["LIST"], z, norm=norm, cmap=cmap, zorder=-9)
+            ax.set_rasterization_zorder(-1)
         else:
-            # Although pcolormesh works with the rasterize option, the tricky method can also be used
-            if log_map:
-                # Mask manually to prevent a UserWarning
-                masked_z = np.ma.masked_where(z <= 0, z)
-                if z_max is None:
-                    z_max = masked_z.max()
-                if z_min is None:
-                    z_min = masked_z.min()
-                    z_min = max(z_min, z_max / 1E9)
-                if rasterized:
-                    plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
-                                         norm=LogNorm(vmin=z_min, vmax=z_max),
-                                         cmap=cmap, zorder=-9)
-                    ax.set_rasterization_zorder(-1)
-                else:
-                    plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
-                                         norm=LogNorm(vmin=z_min, vmax=z_max),
-                                         cmap=cmap)
-            else:
-                if rasterized:
-                    plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap, zorder=-9)
-                    ax.set_rasterization_zorder(-1)
-                else:
-                    plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap)
+            plot = plot_function(axes[0]["LIST"], axes[1]["LIST"], z, norm=norm, cmap=cmap)
 
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)
@@ -766,7 +727,7 @@ class Diagnostic:
         return fig, ax
 
     def time_2d_animation(self, output_path=None, dataset_selector=None, axes_selector=None, time_selector=None,
-                          dpi=200, fps=1, cmap=None, log_map=False, rasterized=True, z_min=None,
+                          dpi=200, fps=1, cmap=None, norm=None, rasterized=True, z_min=None,
                           z_max=None, latex_label=True, interval=200):
         """
         Generate a plot of 2d data as a color map which animated in time.
@@ -790,14 +751,16 @@ class Diagnostic:
             fps (int): The frames per seconds (only if exporting to mp4).
             latex_label (bool): Whether for use LaTeX code for the plot.
             cmap (str or `matplotlib.colors.Colormap`): The Colormap to use in the plot.
-            log_map (bool): Whether the map is plot in log scale. If the log scale is too wide and values are not
-                            displayed in the bar, use the z_min or z_max parameters to fix it.
+            norm (str or `matplotlib.colors.Normalize`): How to scale the colormap. For advanced manipulation, use some
+                           Normalize subclass, e.g., colors.SymLogNorm(0.01). Automatic scales can be selected with
+                           the following strings:
+
+                           * "lin": Linear scale from minimum to maximum.
+                           * "log": Logarithmic scale from minimum to maximum up to vmax/vmin>1E9, otherwise increasing vmin.
+
+
             rasterized (bool): Whether the map is rasterized. This does not apply to axes, title... Note non-rasterized
                                images with large amount of data exported to PDF might challenging to handle.
-            z_max (float): Maximum value for the colormap in log scale. If None it is automatically set to the maximum. 
-            z_min (float): Maximum value for the colormap in log scale. If None it is automatically set to the minimum,
-                           unless z_max/z_min>1E9, then z_min will be set to zmax/1E9 to allow the scale to be shown.
-
         Returns:
             (`matplotlib.figure.Figure`, `matplotlib.axes.Axes`, `matplotlib.animation.FuncAnimation`):
             Objects representing the generated plot and its animation.
@@ -838,30 +801,16 @@ class Diagnostic:
         if len(time_list) < 2:
             raise ValueError("At least two time snapshots are needed to make an animation")
 
-        # Although pcolormesh works with the rasterize option, the tricky method can also be used
-        if log_map:
-            # Mask manually to prevent a UserWarning
-            masked_z = np.ma.masked_where(z <= 0, z)
-            if z_max is None:
-                z_max = masked_z.max()
-            if z_min is None:
-                z_min = masked_z.min()
-                z_min = max(z_min, z_max / 1E9)
-            if rasterized:
-                plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
-                                     norm=LogNorm(vmin=z_min, vmax=z_max),
-                                     cmap=cmap, zorder=-9)
-                ax.set_rasterization_zorder(-1)
-            else:
-                plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], masked_z,
-                                     norm=LogNorm(vmin=z_min, vmax=z_max),
-                                     cmap=cmap)
+        norm = _autonorm(norm, z)
+
+        plot_function = ax.pcolormesh
+        if rasterized:
+            # Rasterizing in contourf is a bit tricky
+            # Cf. http://stackoverflow.com/questions/33250005/size-of-matplotlib-contourf-image-files
+            plot = plot_function(axes[0]["LIST"], axes[1]["LIST"], z, norm=norm, cmap=cmap, zorder=-9)
+            ax.set_rasterization_zorder(-1)
         else:
-            if rasterized:
-                plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap, zorder=-9)
-                ax.set_rasterization_zorder(-1)
-            else:
-                plot = ax.pcolormesh(axes[0]["LIST"], axes[1]["LIST"], z, cmap=cmap)
+            plot = plot_function(axes[0]["LIST"], axes[1]["LIST"], z, norm=norm, cmap=cmap)
 
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)
