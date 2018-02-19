@@ -553,7 +553,9 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
         run_name (str): Name of the job in the engine.
         remote_dir (str): If provided, a remote directory where the run will be carried, which might be only available
                           in the node selected by the engine. Note that if this option is used, the returned Run
-                          instance will not access the remote_dir, but the run_dir.
+                          instance will not access the remote_dir, but the run_dir. If the remote node is unable to
+                          access the path (trying to create it if needed), OSIRIS will be started in the run dir and
+                          errors will be logged by the queue system.
         clean_dir (bool): Whether to remove the files in the directory before execution.
 
     Returns:
@@ -666,13 +668,12 @@ def run_variation_grid(config, variation, run_base, remote_dir=None, on_existing
         variation (`Variation`): Description of the variations to apply.
         run_base (str): Path to the directory where the runs will take place, each in a folder named var_number.
         remote_dir (str): If provided, a remote directory where the runs will be carried, which might be only available
-                          in the node selected by the engine. Note that if this option is used, the returned Run
-                          instances will not access the remote_dir, but the run_dir.
+                          in the node selected by the engine. See :func:`~duat.osiris.run.run_config_grid`.
         on_existing (str): Action to do if a run of the variation exists. Only the names of the subfolders are used for
                            this purpose, which means the run could be different if the variation or the path have
                            changed. Set to "ignore" to leave untouched existing runs or set to "overwrite" to delete the
                            data and run a new instance. Default is like "ignore" but raising a warning.
-        **kwargs: Keyword arguments to pass to :func:`~duat.osiris.run.run_config_grid`
+        **kwargs: Keyword arguments to pass to :func:`~duat.osiris.run.run_config_grid`.
 
     Returns:
         list of Run: List with the Run instances in the variation directory.
