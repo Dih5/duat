@@ -659,7 +659,7 @@ def run_variation(config, variation, run_base, caller=None, on_existing=None, **
     return r_list
 
 
-def run_variation_grid(config, variation, run_base, remote_dir=None, on_existing=None, **kwargs):
+def run_variation_grid(config, variation, run_base, run_name="os-var_", remote_dir=None, on_existing=None, **kwargs):
     """
     Make consecutive calls to :func:`~duat.osiris.run.run_config_grid` with ConfigFiles generated from a variation.
 
@@ -667,6 +667,7 @@ def run_variation_grid(config, variation, run_base, remote_dir=None, on_existing
         config (`ConfigFile`): Base configuration file.
         variation (`Variation`): Description of the variations to apply.
         run_base (str): Path to the directory where the runs will take place, each in a folder named var_number.
+        run_name (str): Prefix to the name to use in the grid system.
         remote_dir (str): If provided, a remote directory where the runs will be carried, which might be only available
                           in the node selected by the engine. See :func:`~duat.osiris.run.run_config_grid`.
         on_existing (str): Action to do if a run of the variation exists. Only the names of the subfolders are used for
@@ -699,17 +700,17 @@ def run_variation_grid(config, variation, run_base, remote_dir=None, on_existing
                 pass
             else:  # overwrite
                 if remote_dir:
-                    run_config_grid(c, var_dir, run_name="osiris_" + var_name,
+                    run_config_grid(c, var_dir, run_name=run_name + str(i),
                                     remote_dir=path.join(remote_dir, var_name), **kwargs)
                 else:
-                    run_config_grid(c, var_dir, run_name="osiris_" + var_name, **kwargs)
+                    run_config_grid(c, var_dir, run_name=run_name + str(i), **kwargs)
         else:
             # The item did not exist
             if remote_dir:
-                run_config_grid(c, var_dir, run_name="osiris_" + var_name, remote_dir=path.join(remote_dir, var_name),
+                run_config_grid(c, var_dir, run_name=run_name + str(i), remote_dir=path.join(remote_dir, var_name),
                                 **kwargs)
             else:
-                run_config_grid(c, var_dir, run_name="osiris_" + var_name, **kwargs)
+                run_config_grid(c, var_dir, run_name=run_name + str(i), **kwargs)
         r_list.append(Run(var_dir))
 
     return r_list
