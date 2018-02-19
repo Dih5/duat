@@ -97,6 +97,12 @@ def _autonorm(norm, z):
     return norm
 
 
+def _fix_colorbar(cbar):
+    # Manual fix for matplotlib's 8358 issue
+    if isinstance(cbar.norm, colors.LogNorm) or isinstance(cbar.norm, colors.SymLogNorm):
+        cbar.ax.minorticks_off()
+
+
 class Diagnostic:
     """
     A OSIRIS diagnostic.
@@ -609,7 +615,7 @@ class Diagnostic:
 
         ax.set_title("%s (%s)" % (title_name, title_units))
 
-        fig.colorbar(plot)
+        _fix_colorbar(fig.colorbar(plot))
 
         if output_path:  # "" or None
             plt.savefig(output_path, dpi=dpi)
@@ -714,7 +720,7 @@ class Diagnostic:
 
         ax.set_title("%s (%s)" % (title_name, title_units))
 
-        fig.colorbar(plot)
+        _fix_colorbar(fig.colorbar(plot))
 
         if output_path:  # "" or None
             plt.savefig(output_path, dpi=dpi)
@@ -817,7 +823,7 @@ class Diagnostic:
 
         ax.set_title(_create_label(title_name, title_units, latex_label))
 
-        fig.colorbar(plot)
+        _fix_colorbar(fig.colorbar(plot))
 
         # Prepare a function for the updates
         def update(i):
