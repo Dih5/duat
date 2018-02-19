@@ -552,12 +552,12 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
         run_dir (str): Folder where the run will be carried.
         run_name (str): Name of the job in the engine.
         remote_dir (str): If provided, a remote directory where the run will be carried, which might be only available
-                          in the node selected by the engine. Note that if this option is used, the returned Run objects
-                          will not access the remote_dir, but the run_dir.
+                          in the node selected by the engine. Note that if this option is used, the returned Run
+                          instance will not access the remote_dir, but the run_dir.
         clean_dir (bool): Whether to remove the files in the directory before execution.
 
     Returns:
-        tuple: A Run instance describing the execution.
+        Run: A Run instance describing the execution.
 
     """
     # Clean if needed
@@ -657,7 +657,7 @@ def run_variation(config, variation, run_base, caller=None, on_existing=None, **
     return r_list
 
 
-def run_variation_grid(config, variation, run_base, on_existing=None, **kwargs):
+def run_variation_grid(config, variation, run_base, remote_dir=None, on_existing=None, **kwargs):
     """
     Make consecutive calls to :func:`~duat.osiris.run.run_config_grid` with ConfigFiles generated from a variation.
 
@@ -665,6 +665,9 @@ def run_variation_grid(config, variation, run_base, on_existing=None, **kwargs):
         config (`ConfigFile`): Base configuration file.
         variation (`Variation`): Description of the variations to apply.
         run_base (str): Path to the directory where the runs will take place, each in a folder named var_number.
+        remote_dir (str): If provided, a remote directory where the runs will be carried, which might be only available
+                          in the node selected by the engine. Note that if this option is used, the returned Run
+                          instances will not access the remote_dir, but the run_dir.
         on_existing (str): Action to do if a run of the variation exists. Only the names of the subfolders are used for
                            this purpose, which means the run could be different if the variation or the path have
                            changed. Set to "ignore" to leave untouched existing runs or set to "overwrite" to delete the
@@ -676,7 +679,7 @@ def run_variation_grid(config, variation, run_base, on_existing=None, **kwargs):
 
     """
     r_list = []
-    # TODO: Either support remote_dir option here or delete it from run_config_grid
+
     if on_existing is not None:
         if not isinstance(on_existing, str):
             raise ValueError("Invalid on_existing parameter")
@@ -694,10 +697,18 @@ def run_variation_grid(config, variation, run_base, on_existing=None, **kwargs):
             elif on_existing == "ignore":
                 pass
             else:  # overwrite
-                run_config_grid(c, var_dir, run_name="osiris_" + var_name, **kwargs)
+                if remote_dir:
+                    run_config_grid(c, var_dir, run_name="osiris_" + var_name,
+                                    remote_dir=path.join(remote_dir, var_name), **kwargs)
+                else:
+                    run_config_grid(c, var_dir, run_name="osiris_" + var_name, **kwargs)
         else:
             # The item did not exist
-            run_config_grid(c, var_dir, run_name="osiris_" + var_name, **kwargs)
+            if remote_dir:
+                run_config_grid(c, var_dir, run_name="osiris_" + var_name, remote_dir=path.join(remote_dir, var_name),
+                                **kwargs)
+            else:
+                run_config_grid(c, var_dir, run_name="osiris_" + var_name, **kwargs)
         r_list.append(Run(var_dir))
 
     return r_list
