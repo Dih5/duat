@@ -49,10 +49,46 @@ def set_osiris_path(folder, warn=True):
         logger.warning("osiris-3D not found in %s" % folder)
 
 
+class _memoized(object):
+    def __init__(self, calls_to_live=5, time_to_live=2):
+        self.cache = {}
+        self.calls_to_live = calls_to_live
+        self.time_to_live = time_to_live
+        self._call_count = 1
+
+    def __call__(self, func):
+        def _memoized_function(*args):
+            self.func = func
+            now = time()
+            try:
+                value, last_update = self.cache[args]
+                if self._call_count >= self.calls_to_live or now - last_update > self.time_to_live:
+                    self._call_count = 1
+                    raise AttributeError
+
+                self._call_count += 1
+                return value
+
+            except (KeyError, AttributeError):
+                value = self.func(*args)
+                self.cache[args] = (value, now)
+                return value
+
+            except TypeError:
+                return self.func(*args)
+
+        return _memoized_function
+
+
+@_memoized(calls_to_live=50, time_to_live=2)
+def _get_process_list():
+    return list(psutil.process_iter())
+
+
 def _find_running_exe(exe):
     """Return the list of the pid of the processes of the argument executable (absolute path)"""
     candidates = []
-    for proc in psutil.process_iter():
+    for proc in _get_process_list():
         try:
             pinfo = proc.as_dict(attrs=['pid', 'exe'])
         except psutil.NoSuchProcess:
