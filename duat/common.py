@@ -4,6 +4,7 @@
 import os
 import re
 from multiprocessing import Process, Queue
+from itertools import islice
 import logging
 
 
@@ -126,7 +127,7 @@ class MPCaller:
 
     def __repr__(self):
         return "MPCaller<%d threads, %d tasks in _queue>" % (
-                len(self.processes), self._queue.qsize() - self._ends_in_queue)
+            len(self.processes), self._queue.qsize() - self._ends_in_queue)
 
     def spawn_threads(self, num_threads):
         """Create the required number of processes and add them to the caller.
@@ -200,6 +201,22 @@ class MPCaller:
             # Just in case, create a new one
             self._queue = Queue()
             self._ends_in_queue = 0
+
+
+def head(path, lines=10):
+    """
+    Get the first lines of a file.
+
+    Args:
+        path (str): Path to the file to read.
+        lines (int): Number of lines to read.
+
+    Returns:
+        :obj:`list` of :obj:`str`: The lines found.
+
+    """
+    with open(path) as f:
+        return list(islice(f, lines))
 
 
 def tail(path, lines=1, _step=4098):

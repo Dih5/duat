@@ -12,7 +12,7 @@ from xml.etree import ElementTree
 import psutil
 
 from duat.plot import get_diagnostic_list as _get_diagnostic_list
-from duat.common import ensure_dir_exists, ensure_executable, ifd, tail, logger, get_dir_size, human_order_key, \
+from duat.common import ensure_dir_exists, ensure_executable, ifd, head, tail, logger, get_dir_size, human_order_key, \
     MPCaller, \
     Call
 
@@ -63,6 +63,9 @@ def _find_running_exe(exe):
     return candidates
 
 
+_qstat_available = True
+
+
 def _get_grid_jobs():
     """
     Get information of active jobs in qstat
@@ -76,9 +79,13 @@ def _get_grid_jobs():
             
             
     """
+    global _qstat_available
+    if not _qstat_available:
+        return None
     try:
         output = subprocess.check_output("qstat -xml 2> /dev/null", shell=True)
     except subprocess.CalledProcessError:
+        _qstat_available = False
         return None  # qstat not available
     tree = ElementTree.fromstring(output)
     jobs = []
@@ -202,7 +209,7 @@ class Run:
         try:
             if not candidates:  # No process running found
                 self.process = None
-                # Try to find a job in queu
+                # Try to find a job in queue
                 jobs = _get_grid_jobs()
                 if not jobs:  # Either no qstat or empty list
                     self.running_mode = ""
@@ -269,13 +276,10 @@ class Run:
 
     def _is_finished(self):
         # Public interface is given by get_status instead.
-        if self._is_running():  # Which calls update
-            return False
+        if path.isfile(path.join(self.run_dir, "TIMINGS", "timings.001")):
+            return True
         else:
-            if path.isfile(path.join(self.run_dir, "TIMINGS", "timings.001")):
-                return True
-            else:
-                return False
+            return False
 
     def _has_error(self):
         """Search for common error messages in the output file."""
@@ -290,10 +294,13 @@ class Run:
         try:
             with open(path.join(self.run_dir, "out.txt"), "r") as f:
                 text = f.read()
-            # TODO: Optimize this search
+            # TODO: Depending on the file size, the following might be better. Investigate this.
+            # text = "".join(head(path.join(self.run_dir, "out.txt"), 300)+tail(path.join(self.run_dir, "out.txt"), 10))
+
+            # TODO: The commented option is slower (even if compiled) than this one. Investigate.
             if "(*error*)" in text or re.search("Error reading .* parameters", text) or re.search(
-                    "MPI_ABORT was invoked",
-                    text):
+                    "MPI_ABORT was invoked", text):
+                # if re.search("\(\*error\*\)|Error reading .* parameters|MPI_ABORT was invoked",text):
                 return True
             else:
                 return False
