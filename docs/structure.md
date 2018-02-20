@@ -1,11 +1,10 @@
-.. _structure:
-# Config file structure in duat
+# ConfigFile structure
 By running
 ```python
 from duat import config
 print(config.ConfigFile.get_structure())
 ```
-you can see an updated description of how the Config file is described in duat.
+you can see an updated description of how an OSIRIS configuration file is described in duat.
 The output is the following:
 
 - simulation (Section)

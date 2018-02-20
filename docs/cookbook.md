@@ -1,4 +1,4 @@
-# duat cookbook
+# Cookbook
 
 ## Create a OSIRIS config file
 ```python
