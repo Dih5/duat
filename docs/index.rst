@@ -11,6 +11,7 @@ Cookbook and general information:
 .. toctree::
    :maxdepth: 2
 
+   intro.ipynb
    cookbook.md
    structure.md
 

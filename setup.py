@@ -98,7 +98,7 @@ setup(
         'dev': [],
         'test': [],
         'demos': [],
-        'docs': ['sphinx_rtd_theme', 'recommonmark'],
+        'docs': ['sphinx_rtd_theme', 'recommonmark', 'nbsphinx'],
     },
 
     # If there are data files included in your packages that need to be
