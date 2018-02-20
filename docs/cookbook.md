@@ -9,15 +9,18 @@ sim["grid"]["nx_p"] = 4000
 # Check the generated fortran code
 print(sim)
 ```
+Sections are almost like regular OSIRIS input, although repeatable sections have a `_link` suffix; for example,
+`sim["species_list"][0]` is the first species. See [structure](structure.html) for details.
 
 ## Run a config file
 ```python
 from duat import run
 # [...]
 # Create a ConfigFile instance sim
-myrun = run.run_config(sim, "/home/user/myrun", prefix="", blocking=False, clean_dir=True)
+myrun = run.run_config(sim, "/home/user/myrun", blocking=False, clean_dir=True)
 # The returned Run instance offers some useful info. Check the API documentation
 ```
+To run in a grid system use `run_config_grid` instead.
 
 ## Run a variation
 ```python
@@ -29,6 +32,7 @@ values = [0.2, 0.5, 0.7, 1.0, 1.2] # Values to take
 var = config.Variation((parameter, values)) # Add more 2-tuples for cartesian product of parameter variation
 run_list = run.run_variation(sim, var, "/home/user/myvar", caller=3) # Create three threads executing simulations
 ```
+To run in a grid system use `run_variation_grid` instead.
 
 ## Plot results with matplotlib
 ```python

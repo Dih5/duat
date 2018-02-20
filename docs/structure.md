@@ -1,3 +1,4 @@
+.. _structure:
 # Config file structure in duat
 By running
 ```python

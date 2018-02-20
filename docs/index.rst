@@ -6,7 +6,16 @@
 duat documentation
 ==================
 
-API documentation:
+Cookbook and general information:
+
+.. toctree::
+   :maxdepth: 2
+
+   cookbook.md
+   structure.md
+
+
+API reference:
 
 .. toctree::
    :maxdepth: 2
@@ -16,15 +25,6 @@ API documentation:
    plot.rst
    common.rst
    data.rst
-
-
-Cookbook and information:
-
-.. toctree::
-   :maxdepth: 2
-
-   cookbook.md
-   structure.md
 
 
 
