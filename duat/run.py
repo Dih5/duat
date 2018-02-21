@@ -80,6 +80,7 @@ class _memoized(object):
         return _memoized_function
 
 
+# Memoize the process list so consecutive calls to _find_running_exe are faster (e.g., working with a list of Run).
 @_memoized(calls_to_live=50, time_to_live=2)
 def _get_process_list():
     return list(psutil.process_iter())
@@ -102,6 +103,20 @@ def _find_running_exe(exe):
 _qstat_available = True
 
 
+# Memoize the process list so consecutive calls to _get_grid_jobs are faster (e.g., working with a list of Run).
+# Also, if qstat is not available, stop trying to call it.
+@_memoized(calls_to_live=50, time_to_live=2)
+def _general_qstat():
+    global _qstat_available
+    if not _qstat_available:
+        return None
+    try:
+        return subprocess.check_output("qstat -xml 2> /dev/null", shell=True)
+    except subprocess.CalledProcessError:
+        _qstat_available = False
+        return None  # qstat not available
+
+
 def _get_grid_jobs():
     """
     Get information of active jobs in qstat
@@ -115,14 +130,9 @@ def _get_grid_jobs():
             
             
     """
-    global _qstat_available
-    if not _qstat_available:
+    output = _general_qstat()
+    if not output:
         return None
-    try:
-        output = subprocess.check_output("qstat -xml 2> /dev/null", shell=True)
-    except subprocess.CalledProcessError:
-        _qstat_available = False
-        return None  # qstat not available
     tree = ElementTree.fromstring(output)
     jobs = []
     for job in tree.iter('job_list'):
