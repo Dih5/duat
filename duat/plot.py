@@ -613,7 +613,7 @@ class Diagnostic:
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(time_list[0], time_list[-1])
 
-        ax.set_title("%s (%s)" % (title_name, title_units))
+        ax.set_title(_create_label(title_name, title_units, latex_label))
 
         _fix_colorbar(fig.colorbar(plot))
 
@@ -718,7 +718,7 @@ class Diagnostic:
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)
 
-        ax.set_title("%s (%s)" % (title_name, title_units))
+        ax.set_title(_create_label(title_name, title_units, latex_label))
 
         _fix_colorbar(fig.colorbar(plot))
 
