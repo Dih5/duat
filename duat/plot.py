@@ -590,9 +590,6 @@ class Diagnostic:
         ax.set_xlabel(_create_label(x_name, x_units, latex_label))
         ax.set_ylabel(_create_label(y_name, y_units, latex_label))
 
-        if latex_label and _is_latex(title_name):
-            title_name = "$" + _improve_latex(title_name) + "$"
-
         time_list = self.get_time_list(time_selector)
 
         # Gather the points
@@ -688,9 +685,6 @@ class Diagnostic:
 
         ax.set_xlabel(_create_label(x_name, x_units, latex_label))
         ax.set_ylabel(_create_label(y_name, y_units, latex_label))
-
-        if latex_label and _is_latex(title_name):
-            title_name = "$" + _improve_latex(title_name) + "$"
 
         time_list = self.get_time_list(time_selector)
 
