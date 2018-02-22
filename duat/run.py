@@ -640,9 +640,9 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
     # Create a start.sh file with the launch script
     s = "".join(["#!/bin/bash\n#\n#$ -cwd\n#$ -S /bin/bash\n#$ -N %s\n#\n" % run_name,
                  "NEW_DIR=%s\nmkdir -p $NEW_DIR\ncp -r . $NEW_DIR\ncd $NEW_DIR\n" % remote_dir if remote_dir else "",
-                 prolog,
-                 "\n./osiris > out.txt 2> err.txt",
-                 epilog])
+                 prolog + "\n",
+                 "\n./osiris > out.txt 2> err.txt\n",
+                 epilog + "\n"])
 
     with open(path.join(run_dir, "start.sh"), 'w') as f:
         f.write(s)
