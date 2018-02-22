@@ -87,8 +87,9 @@ def _get_process_list():
 
 
 def _find_running_exe(exe):
-    """Return the list of the pid of the processes of the argument executable (absolute path)"""
+    """Return the list of the pid of the processes of the argument executable"""
     candidates = []
+    exe = path.abspath(exe)
     for proc in _get_process_list():
         try:
             pinfo = proc.as_dict(attrs=['pid', 'exe'])
