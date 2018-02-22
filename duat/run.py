@@ -648,7 +648,7 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
         f.write(s)
     ensure_executable(path.join(run_dir, "start.sh"))
 
-    subprocess.Popen("qsub " + path.join(run_dir, "start.sh"), shell=True, cwd=path.abspath(run_dir))
+    subprocess.Popen("qsub " + path.abspath(path.join(run_dir, "start.sh")), shell=True, cwd=path.abspath(run_dir))
 
     return Run(run_dir)
 
