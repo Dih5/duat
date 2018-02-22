@@ -596,7 +596,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         return run
 
 
-def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, clean_dir=True):
+def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, clean_dir=True, prolog="", epilog=""):
     """
     Queue a OSIRIS run in a compatible grid (e.g., Sun Grid Engine).
 
@@ -610,6 +610,8 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
                           access the path (trying to create it if needed), OSIRIS will be started in the run dir and
                           errors will be logged by the queue system.
         clean_dir (bool): Whether to remove the files in the directory before execution.
+        prolog (str): Shell code to run before calling OSIRIS (but once in the remote_dir if asked for).
+        epilog (str): Shell code to run after calling OSIRIS.
 
     Returns:
         Run: A Run instance describing the execution.
@@ -638,7 +640,9 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
     # Create a start.sh file with the launch script
     s = "".join(["#!/bin/bash\n#\n#$ -cwd\n#$ -S /bin/bash\n#$ -N %s\n#\n" % run_name,
                  "NEW_DIR=%s\nmkdir -p $NEW_DIR\ncp -r . $NEW_DIR\ncd $NEW_DIR\n" % remote_dir if remote_dir else "",
-                 "\n./osiris > out.txt 2> err.txt"])
+                 prolog,
+                 "\n./osiris > out.txt 2> err.txt",
+                 epilog])
 
     with open(path.join(run_dir, "start.sh"), 'w') as f:
         f.write(s)
