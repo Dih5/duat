@@ -117,6 +117,11 @@ def _general_qstat():
         _qstat_available = False
         return None  # qstat not available
 
+def _get_job_tree_text(job_tree, property):
+    """Get some parameter of an ElementTree representing a job """
+    # Check to prevent AttributeError: 'NoneType' object has no attribute 'text'
+    a = job_tree.find(property)
+    return a.text if a else ""
 
 def _get_grid_jobs():
     """
@@ -142,9 +147,9 @@ def _get_grid_jobs():
         job_tree = ElementTree.fromstring(output)[0][0]  # First index is djob_info, second is element
         jobs.append({
             "job_number": int(job_number),
-            "script": job_tree.find("JB_script_file").text,
-            "submission_time": int(job_tree.find("JB_submission_time").text),
-            "cwd": job_tree.find("JB_cwd").text,
+            "script": _get_job_tree_text(job_tree, "JB_script_file"),
+            "submission_time": int(_get_job_tree_text(job_tree, "JB_submission_time")),
+            "cwd": _get_job_tree_text(job_tree, "JB_cwd"),
         })
     return jobs
 
