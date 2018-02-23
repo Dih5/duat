@@ -145,10 +145,11 @@ def _get_grid_jobs():
         job_number = job[0].text
         output = subprocess.check_output("qstat -j %s -xml" % job[0].text, shell=True)
         job_tree = ElementTree.fromstring(output)[0][0]  # First index is djob_info, second is element
+        time_str = _get_job_tree_text(job_tree, "JB_submission_time")
         jobs.append({
             "job_number": int(job_number),
             "script": _get_job_tree_text(job_tree, "JB_script_file"),
-            "submission_time": int(_get_job_tree_text(job_tree, "JB_submission_time")),
+            "submission_time": int(time_str) if time_str else 0,
             "cwd": _get_job_tree_text(job_tree, "JB_cwd"),
         })
     return jobs
