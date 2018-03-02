@@ -150,10 +150,17 @@ def _get_grid_jobs():
         output = subprocess.check_output("qstat -j %s -xml" % job[0].text, shell=True)
         job_tree = ElementTree.fromstring(output)[0][0]  # First index is djob_info, second is element
         time_str = _get_job_tree_text(job_tree, "JB_submission_time")
+        try:
+            start_time = int(job_tree.find("JB_ja_tasks")[0].find("JAT_start_time").text)
+        except (TypeError, AttributeError):
+            # TypeError if JB_ja_tasks not in the tree (which will happen if not started)
+            # AttributeError if JAT_start_time not in the subtree
+            start_time = 0
         jobs.append({
             "job_number": int(job_number),
             "script": _get_job_tree_text(job_tree, "JB_script_file"),
             "submission_time": int(time_str) if time_str else 0,
+            "start_time": start_time,
             "cwd": _get_job_tree_text(job_tree, "JB_cwd"),
         })
     return jobs
@@ -429,8 +436,10 @@ class Run:
         elif self.running_mode == "local":
             start = self.process.create_time()
         elif self.running_mode == "grid":
-            start = self.job["submission_time"]
-            # TODO: I guess submission time is not start time, so this might be not accurate if queue was full
+            start = self.job["start_time"]
+            if start == 0:
+                # Queued, but not started
+                return float("nan")
         else:
             logger.warning("Invalid running_mode attribute")
             return float("nan")
