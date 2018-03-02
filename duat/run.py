@@ -271,7 +271,7 @@ class Run:
                 if not jobs:  # Either no qstat or empty list
                     self.running_mode = ""
                 else:
-                    script_path = path.join(self.run_dir, "start.sh")
+                    script_path = path.abspath(path.join(self.run_dir, "start.sh"))
                     valid_jobs = list(filter(lambda j: j["script"] == script_path, jobs))
                     if valid_jobs:
                         if len(valid_jobs) > 1:
