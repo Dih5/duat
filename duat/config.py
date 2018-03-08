@@ -122,7 +122,12 @@ class Section(MetaSection):
         return self.pars[ind]
 
     def __setitem__(self, key, value):
-        self.pars[key] = value
+        if value is None:
+            if key in self.pars:
+                self.pars.pop(key)
+            # Otherwise ignore, raising no exception
+        else:
+            self.pars[key] = value
 
     def __contains__(self, key):
         return key in self.pars
@@ -204,6 +209,9 @@ class SectionList(MetaSection):
         return self.lst[ind]
 
     def __setitem__(self, ind, value):
+        if value is None:
+            # TODO: Probably removing an item from a list with the ...= None notation is a bad practice
+            raise NotImplementedError("Removal from a list of Sections is not allowed. If you really need this, consider .lst.pop(number).")
         if ind < len(self.lst):
             self.lst[ind] = value
         elif ind == len(self.lst):
@@ -293,7 +301,12 @@ class SectionOrdered(MetaSection):
     def __setitem__(self, key, value):
         if isinstance(key, int):
             key = self.order[key]
-        self.set_section(key, value)
+        if value is None:
+            if key in self.subsections:
+                self.subsections.pop(key)
+            # Otherwise ignore, raising no exception
+        else:
+            self.set_section(key, value)
 
     def __iter__(self):
         for x in self.order:

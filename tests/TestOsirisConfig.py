@@ -28,6 +28,18 @@ class TestOsirisConfig(unittest.TestCase):
         for d in [1, 2, 3]:
             self.assertEqual(d, ConfigFile(d).get_d())
 
+    def test_None_assign_deletes(self):
+        """Check a None assignment deletes parameters and sections"""
+        sim = ConfigFile(1)
+        self.assertFalse("diag_emf" in sim)
+        sim["diag_emf"]["reports"] = ["e1"]  # Implicit creation
+        self.assertTrue("diag_emf" in sim)
+        self.assertTrue("reports" in sim["diag_emf"])
+        sim["diag_emf"]["reports"] = None  # Remove a parameter
+        self.assertFalse("reports" in sim["diag_emf"])
+        sim["diag_emf"] = None  # Remove the section
+        self.assertFalse("diag_emf" in sim)
+
 
 if __name__ == "__main__":
     unittest.main()
