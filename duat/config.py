@@ -9,7 +9,7 @@ import numpy as np
 from duat.common import ifd, logger
 
 
-def val_to_fortran(val):
+def _val_to_fortran(val):
     """
     Transform a value to Fortran code.
 
@@ -36,7 +36,7 @@ def val_to_fortran(val):
     raise TypeError("Unknown type: " + t)
 
 
-def par_to_fortran(name, val):
+def _par_to_fortran(name, val):
     """
     Transform a parameter to fortran code.
 
@@ -56,7 +56,7 @@ def par_to_fortran(name, val):
 
     t = type(val)
     if t in [bool, int, float, str]:
-        return name + " = " + val_to_fortran(val) + ","
+        return name + " = " + _val_to_fortran(val) + ","
     elif t in [list, tuple]:  # 1D or 2D or 3D
 
         if type(val[0]) in [list, tuple]:  # 2D or 3D
@@ -66,17 +66,17 @@ def par_to_fortran(name, val):
                     for j, row_row in enumerate(row):
                         s += name + "(1:" + str(len(row_row)) + ", " + str(i + 1) + ", " + str(
                             j + 1) + ") = " + ", ".join(
-                            list(map(val_to_fortran, row_row))) + ",\n  "
+                            list(map(_val_to_fortran, row_row))) + ",\n  "
                 return s
             else:  # 2D
                 s = ""
                 for i, row in enumerate(val):
                     s += name + "(1:" + str(len(row)) + ", " + str(i + 1) + ") = " + ", ".join(
-                        list(map(val_to_fortran, row))) + ",\n  "
+                        list(map(_val_to_fortran, row))) + ",\n  "
                 return s
         else:  # 1D
             l = len(val)
-            return name + "(1:" + str(l) + ") = " + ", ".join(list(map(val_to_fortran, val))) + ","
+            return name + "(1:" + str(l) + ") = " + ", ".join(list(map(_val_to_fortran, val))) + ","
     raise TypeError
 
 
@@ -148,7 +148,7 @@ class Section(MetaSection):
     def to_fortran(self):
         s = self.name + "\n{\n"
         for p in self.pars:
-            s += "  " + par_to_fortran(p, self.pars[p]) + "\n"
+            s += "  " + _par_to_fortran(p, self.pars[p]) + "\n"
         s += "}\n"
         return s
 
