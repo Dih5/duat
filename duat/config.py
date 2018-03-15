@@ -87,6 +87,7 @@ class MetaSection:
         return self.to_fortran()
 
     def to_fortran(self):
+        """Return a str with the fortran code representing the instance"""
         raise NotImplementedError()
 
     @classmethod
@@ -540,6 +541,7 @@ class ConfigFile(SectionOrdered):
             path: the path of the output file.
 
         Raises:
+            OSError: if the file could not be opened.
 
         """
         with open(path, "w") as f:
