@@ -545,6 +545,16 @@ class ConfigFile(SectionOrdered):
         with open(path, "w") as f:
             f.write(self.to_fortran())
 
+    def clone(self):
+        """
+        Get a deep copy of the instance
+
+        Returns:
+            ConfigFile: a deep copy of this instance
+
+        """
+        return copy.deepcopy(self)
+
     def get_d(self):
         """
         Get the dimension of the configuration filed.
