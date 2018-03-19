@@ -212,7 +212,8 @@ class SectionList(MetaSection):
     def __setitem__(self, ind, value):
         if value is None:
             # TODO: Probably removing an item from a list with the ...= None notation is a bad practice
-            raise NotImplementedError("Removal from a list of Sections is not allowed. If you really need this, consider .lst.pop(number).")
+            raise NotImplementedError(
+                "Removal from a list of Sections is not allowed. If you really need this, consider .lst.pop(number).")
         if ind < len(self.lst):
             self.lst[ind] = value
         elif ind == len(self.lst):
@@ -486,12 +487,15 @@ class ConfigFile(SectionOrdered):
              "neutral_list": NeutralList, "neutral_mov_ions_list": NeutralMovIonsList, "collisions": Section,
              "zpulse_list": ZpulseList, "current": Section, "smooth_current": SmoothCurrent}
 
-    def __init__(self, d):
+    def __init__(self, d=1, template="default"):
         """
         Create a default d-dimensional config file.
 
         Args:
-            d(int): The number of dimensions (1, 2 or 3).
+            d(int): The number of dimensions (1, 2 or 3), used if a template is provided.
+            template(str): A model for the initial configuration. Available values are:
+                * "default": A basic configuration based on the examples.
+                * "none": Absolutely no configuration.
             
         """
         SectionOrdered.__init__(self, order=ConfigFile.order, fixed=True, types=ConfigFile.types)
@@ -499,27 +503,39 @@ class ConfigFile(SectionOrdered):
         if d not in [1, 2, 3]:
             raise TypeError("Invalid dimension")
 
-        self["node_conf"] = Section("node_conf", {"node_number": [1] * d, "if_periodic": [True] * d})
+        if template is None:
+            template = "none"
+        if not isinstance(template, str):
+            raise TypeError("The template argument must be a string")
+        template = template.lower()
 
-        self["grid"] = Section("grid",
-                               {"coordinates": "cartesian", "nx_p": ifd(d, [1024], [32, 32], [10, 10, 10])})
+        if template == "default":
+            self["node_conf"] = Section("node_conf", {"node_number": [1] * d, "if_periodic": [True] * d})
 
-        self["time_step"] = Section("time_step", {"dt": ifd(d, 0.07, 0.07, 0.05), "ndump": 10})
+            self["grid"] = Section("grid",
+                                   {"coordinates": "cartesian", "nx_p": ifd(d, [1024], [32, 32], [10, 10, 10])})
 
-        self["space"] = Section("space", {"xmin": [0.0] * d, "xmax": ifd(d, [102.4], [3.2, 3.2], [1.0, 1.0, 1.0]),
-                                          "if_move": [False] * d})
+            self["time_step"] = Section("time_step", {"dt": ifd(d, 0.07, 0.07, 0.05), "ndump": 10})
 
-        self["time"] = Section("time", {"tmin": 0.0, "tmax": 7.0})
+            self["space"] = Section("space", {"xmin": [0.0] * d, "xmax": ifd(d, [102.4], [3.2, 3.2], [1.0, 1.0, 1.0]),
+                                              "if_move": [False] * d})
 
-        self["emf_bound"] = Section("emf_bound",
-                                    {"type": ifd(d, [[0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0], [0, 0]])})
+            self["time"] = Section("time", {"tmin": 0.0, "tmax": 7.0})
 
-        self["particles"] = Section("particles", {"num_species": 2})
+            self["emf_bound"] = Section("emf_bound",
+                                        {"type": ifd(d, [[0, 0]], [[0, 0], [0, 0]], [[0, 0], [0, 0], [0, 0]])})
 
-        self["species_list"] = SpeciesList(label="Species configuration")
+            self["particles"] = Section("particles", {"num_species": 2})
 
-        for i in [1, 2]:
-            self["species_list"].append_section(Species(i, dim=d))
+            self["species_list"] = SpeciesList(label="Species configuration")
+
+            for i in [1, 2]:
+                self["species_list"].append_section(Species(i, dim=d))
+
+        elif template == "none":
+            pass
+        else:
+            raise ValueError("Bad template parameter: %s" % template)
 
     def _update_particles(self):
         """Update the particles Section with the currently set data"""
