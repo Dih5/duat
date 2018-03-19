@@ -2,6 +2,7 @@
 """Model OSIRIS configuration files."""
 
 import copy
+import re
 from itertools import product
 
 import numpy as np
@@ -34,6 +35,42 @@ def _val_to_fortran(val):
     elif t is str:
         return '"' + val + '"'
     raise TypeError("Unknown type: " + t)
+
+
+def _fortran_to_val(val):
+    """
+    Transform a Fortran value to a Python one.
+
+    Args:
+        val (str): The value to translate.
+
+    Returns:
+        A Python representation.
+
+    """
+    if val[0] == val[-1] == '"':  # A string
+        return val[1:-1]
+
+    if val == ".true.":
+        return True
+    if val == ".false.":
+        return False
+
+    # Assume a number
+    try:
+        return int(val)
+    except ValueError:
+        pass
+
+    # Assume a float
+    val = val.replace("d", "e").replace("D", "e")
+    try:
+        return float(val)
+    except ValueError:
+        pass
+    return float(val)
+
+    raise TypeError("Unable to parse: " + val)
 
 
 def _par_to_fortran(name, val):
@@ -536,6 +573,62 @@ class ConfigFile(SectionOrdered):
             pass
         else:
             raise ValueError("Bad template parameter: %s" % template)
+
+    @classmethod
+    def from_string(cls, string):
+        """Create and return an instance from a fortran code representation"""
+        sim = ConfigFile(template="none")
+        # Get (block_name, block_content) items
+        blocks = re.findall(r"([^\n]*?)\n?{(.*?)\}", string, re.MULTILINE and re.DOTALL)
+
+        for m in blocks:
+            if m[0] == "particles":
+                # TODO: Account for other than regular species
+                pass
+            else:
+                if m[0] == "species":
+                    l = len(sim["species_list"])
+                    sim["species_list"][l] = Species(label=l + 1)
+                    prev = sim["species_list"][l]
+                    block = prev["species"]
+                elif m[0] in ["profile", "spe_bound", "diag_species"]:
+                    block = prev[m[0]]
+                else:
+                    block = sim[m[0]]
+                sizes = {}
+                to_parse = {}
+                # Get (parameter_name, access_modifier, parameter_value) items
+                variables = re.findall(r"^\s*(\w*)\s*\(?(.*?)\)?\s*=\s* (.*?),$", m[1], re.MULTILINE)
+                for variable in variables:
+                    if variable[1]:
+                        dim = variable[1].count(",") + 1
+                        if dim == 1:
+                            block[variable[0]] = list(map(_fortran_to_val, variable[2].split(",")))
+                        elif dim == 2:
+                            i = int(variable[1].split(",")[-1])
+                            if variable[0] in sizes:
+                                sizes[variable[0]] = max(sizes[variable[0]], i)
+                            else:
+                                sizes[variable[0]] = i
+                                to_parse[variable[0]] = {}
+                            to_parse[variable[0]][i] = list(map(_fortran_to_val, variable[2].split(",")))
+                        elif dim == 3:
+                            raise NotImplementedError("Importing from dim 3 data is not yet implemented")
+                        else:
+                            raise ValueError("Parameter of dimension %d > 3", dim)
+                    else:
+                        block[variable[0]] = _fortran_to_val(variable[2])
+
+                for (key, size) in sizes.items():  # inefficient on Py2
+                    block[key] = [to_parse[key][i] for i in range(1, size + 1)]
+        return sim
+
+    @classmethod
+    def from_file(cls, file_path):
+        """Create and return an instance from a fortran code representation in a file"""
+        with open(file_path, "r") as f:
+            text = f.read()
+        return ConfigFile.from_string(text)
 
     def _update_particles(self):
         """Update the particles Section with the currently set data"""

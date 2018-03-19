@@ -7,9 +7,16 @@ TestOsirisConfig.py: Tests for the `osiris.config` module.
 
 import unittest
 
+import re
+
 from duat import config
 
 import numpy as np
+
+
+def _remove_comments(s):
+    """Remove fortran comments from string"""
+    return "\n".join(filter(lambda s2: not re.match("!--.*", s2), s.split("\n")))
 
 
 class TestOsirisConfig(unittest.TestCase):
@@ -41,6 +48,12 @@ class TestOsirisConfig(unittest.TestCase):
         self.assertFalse("reports" in sim["diag_emf"])
         sim["diag_emf"] = None  # Remove the section
         self.assertFalse("diag_emf" in sim)
+
+    def test_from_string(self):
+        """Check the same config file is obtained from its fortran code"""
+        s = config.ConfigFile(d=1, template="default").to_fortran()
+        s2 = config.ConfigFile.from_string(s).to_fortran()
+        self.assertEqual(_remove_comments(s), _remove_comments(s2))
 
 
 if __name__ == "__main__":
