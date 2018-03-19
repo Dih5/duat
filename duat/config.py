@@ -527,7 +527,7 @@ class ConfigFile(SectionOrdered):
 
             self["particles"] = Section("particles", {"num_species": 2})
 
-            self["species_list"] = SpeciesList(label="Species configuration")
+            self["species_list"] = SpeciesList()
 
             for i in [1, 2]:
                 self["species_list"].append_section(Species(i, dim=d))
