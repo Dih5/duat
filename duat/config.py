@@ -619,7 +619,7 @@ class ConfigFile(SectionOrdered):
                         elif dim == 3:
                             raise NotImplementedError("Importing from dim 3 data is not yet implemented")
                         else:
-                            raise ValueError("Parameter of dimension %d > 3", dim)
+                            raise ValueError("Parameter of dimension %d > 3" % dim)
                     else:
                         block[parameter] = _fortran_to_val(value)
 
