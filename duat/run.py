@@ -15,6 +15,7 @@ from duat.plot import get_diagnostic_list as _get_diagnostic_list
 from duat.common import ensure_dir_exists, ensure_executable, ifd, head, tail, logger, get_dir_size, human_order_key, \
     MPCaller, \
     Call
+from duat.config import ConfigFile
 
 # Path to osiris executables - guessed later in the code
 osiris_1d = ""
@@ -217,6 +218,10 @@ class Run:
         self.job = None
 
         self._update()
+
+    def get_config(self):
+        """Return a ConfigFile instance parsing the os-stdin file"""
+        return ConfigFile.from_file(path.join(self.run_dir, "os-stdin"))
 
     def get_status(self):
         """
