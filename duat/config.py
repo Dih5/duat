@@ -68,7 +68,6 @@ def _fortran_to_val(val):
         return float(val)
     except ValueError:
         pass
-    return float(val)
 
     raise TypeError("Unable to parse: " + val)
 
