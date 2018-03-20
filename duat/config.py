@@ -581,47 +581,47 @@ class ConfigFile(SectionOrdered):
         blocks = re.findall(r"([^\n]*?)\n?{(.*?)\}", string, re.MULTILINE and re.DOTALL)
 
         for m in blocks:
-            if m[0] == "particles":
+            section = m[0]
+            if section == "particles":
                 # TODO: Account for other than regular species
                 pass
             else:
-                if m[0] == "species":
+                if section == "species":
                     l = len(sim["species_list"])
                     sim["species_list"][l] = Species(label=l + 1)
                     prev = sim["species_list"][l]
                     block = prev["species"]
-                elif m[0] in ["profile", "spe_bound", "diag_species"]:
-                    block = prev[m[0]]
-                elif m[0] == "zpulse":
+                elif section in ["profile", "spe_bound", "diag_species"]:
+                    block = prev[section]
+                elif section == "zpulse":
                     sim["zpulse_list"].append_section(Section(name="zpulse"))
                     block = sim["zpulse_list"][-1]
                 else:
-                    block = sim[m[0]]
+                    block = sim[section]
                 sizes = {}
                 to_parse = {}
                 # Get (parameter_name, access_modifier, parameter_value) items
                 variables = re.findall(r"^\s*(\w*)\s*\(?(.*?)\)?\s*=\s* (.*?),$", m[1], re.MULTILINE)
                 for variable in variables:
-                    if variable[1]:
-                        dim = variable[1].count(",") + 1
+                    parameter, modifier, value = variable
+                    if modifier:
+                        dim = modifier.count(",") + 1
                         if dim == 1:
-                            block[variable[0]] = list(map(lambda x: _fortran_to_val(x.strip()),
-                                                          variable[2].split(",")))
+                            block[parameter] = list(map(lambda x: _fortran_to_val(x.strip()), value.split(",")))
                         elif dim == 2:
-                            i = int(variable[1].split(",")[-1])
-                            if variable[0] in sizes:
-                                sizes[variable[0]] = max(sizes[variable[0]], i)
+                            i = int(modifier.split(",")[-1])
+                            if parameter in sizes:
+                                sizes[parameter] = max(sizes[parameter], i)
                             else:
-                                sizes[variable[0]] = i
-                                to_parse[variable[0]] = {}
-                            to_parse[variable[0]][i] = list(map(lambda x: _fortran_to_val(x.strip()),
-                                                                variable[2].split(",")))
+                                sizes[parameter] = i
+                                to_parse[parameter] = {}
+                            to_parse[parameter][i] = list(map(lambda x: _fortran_to_val(x.strip()), value.split(",")))
                         elif dim == 3:
                             raise NotImplementedError("Importing from dim 3 data is not yet implemented")
                         else:
                             raise ValueError("Parameter of dimension %d > 3", dim)
                     else:
-                        block[variable[0]] = _fortran_to_val(variable[2])
+                        block[parameter] = _fortran_to_val(value)
 
                 for (key, size) in sizes.items():  # inefficient on Py2
                     block[key] = [to_parse[key][i] for i in range(1, size + 1)]
