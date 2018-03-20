@@ -603,7 +603,8 @@ class ConfigFile(SectionOrdered):
                     if variable[1]:
                         dim = variable[1].count(",") + 1
                         if dim == 1:
-                            block[variable[0]] = list(map(_fortran_to_val, variable[2].split(",")))
+                            block[variable[0]] = list(map(lambda x: _fortran_to_val(x.strip()),
+                                                          variable[2].split(",")))
                         elif dim == 2:
                             i = int(variable[1].split(",")[-1])
                             if variable[0] in sizes:
@@ -611,7 +612,8 @@ class ConfigFile(SectionOrdered):
                             else:
                                 sizes[variable[0]] = i
                                 to_parse[variable[0]] = {}
-                            to_parse[variable[0]][i] = list(map(_fortran_to_val, variable[2].split(",")))
+                            to_parse[variable[0]][i] = list(map(lambda x: _fortran_to_val(x.strip()),
+                                                                variable[2].split(",")))
                         elif dim == 3:
                             raise NotImplementedError("Importing from dim 3 data is not yet implemented")
                         else:
