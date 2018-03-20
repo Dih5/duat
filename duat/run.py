@@ -626,13 +626,16 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         return run
 
 
-def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, clean_dir=True, prolog="", epilog=""):
+def run_config_grid(config, run_dir, prefix=None, run_name="osiris_run", remote_dir=None, clean_dir=True, prolog="",
+                    epilog=""):
     """
     Queue a OSIRIS run in a compatible grid (e.g., Sun Grid Engine).
 
     Args:
         config (`ConfigFile`): The instance describing the configuration file.
         run_dir (str): Folder where the run will be carried.
+        prefix (str): A prefix to run the command. If None, "mpirun -np X " will be used when a config with multiple
+                      nodes is provided.
         run_name (str): Name of the job in the engine.
         remote_dir (str): If provided, a remote directory where the run will be carried, which might be only available
                           in the node selected by the engine. Note that if this option is used, the returned Run
@@ -657,6 +660,16 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
             for f in files:
                 logger.warning("Could not remove file %s" % f)
 
+    # Find the needed amount of nodes
+    try:
+        n = sum(config["node_conf"]["node_number"])
+
+    except (ValueError, KeyError):  # node_conf or node_number don't exist
+        n = 1
+
+    if prefix is None:
+        prefix = "mpirun -np %d " % n if n > 1 else ""
+
     # copy the input file
     ensure_dir_exists(run_dir)
     config.write(path.join(run_dir, "os-stdin"))
@@ -668,10 +681,12 @@ def run_config_grid(config, run_dir, run_name="osiris_run", remote_dir=None, cle
     ensure_executable(osiris_path)
 
     # Create a start.sh file with the launch script
-    s = "".join(["#!/bin/bash\n#\n#$ -cwd\n#$ -S /bin/bash\n#$ -N %s\n#\n" % run_name,
+    s = "".join(["#!/bin/bash\n#\n#$ -cwd\n#$ -S /bin/bash\n#$ -N %s\n" % run_name,
+                 "#$ -pe smp %d\n" % n if n > 1 else "",
+                 "#\n",
                  "NEW_DIR=%s\nmkdir -p $NEW_DIR\ncp -r . $NEW_DIR\ncd $NEW_DIR\n" % remote_dir if remote_dir else "",
                  prolog + "\n",
-                 "\n./osiris > out.txt 2> err.txt\n",
+                 "\n%s./osiris > out.txt 2> err.txt\n" % prefix,
                  epilog + "\n"])
 
     with open(path.join(run_dir, "start.sh"), 'w') as f:
