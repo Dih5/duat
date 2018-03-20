@@ -592,6 +592,9 @@ class ConfigFile(SectionOrdered):
                     block = prev["species"]
                 elif m[0] in ["profile", "spe_bound", "diag_species"]:
                     block = prev[m[0]]
+                elif m[0] == "zpulse":
+                    sim["zpulse_list"].append_section(Section(name="zpulse"))
+                    block = sim["zpulse_list"][-1]
                 else:
                     block = sim[m[0]]
                 sizes = {}
