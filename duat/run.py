@@ -524,7 +524,8 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
     Args:
         config (`ConfigFile`): The instance describing the configuration file.
         run_dir (str): Folder where the run is carried.
-        prefix (str): A prefix to run the command.
+        prefix (str): A prefix to run the command. If None, "mpirun -np X " will be used when a config with multiple
+                      nodes is provided.
         clean_dir (bool): Whether to remove the files in the directory before execution.
         blocking (bool): Whether to wait for the run to finish.
         force (str): Set what to do if a running executable is found in the directory. Set to "ignore" to launch anyway,
@@ -537,9 +538,13 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         tuple: A Run instance describing the execution.
 
     """
-    # Normalize parameters
-    if not prefix:  # None or ""
-        prefix = ""
+    # Automatic mpirun
+    if prefix is None:
+        try:
+            n = sum(config["node_conf"]["node_number"])
+            prefix = "mpirun -np %d " % n
+        except (ValueError, KeyError):  # node_conf or node_number don't exist
+            prefix = ""
     elif prefix[-1] != " ":
         prefix += " "
 
@@ -586,14 +591,14 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
 
     # Create a start.sh file to ease manual launch
     with open(path.join(run_dir, "start.sh"), 'w') as f:
-        f.write("#!/bin/bash\n./osiris > out.txt 2> err.txt")
+        f.write("#!/bin/bash\n%s./osiris > out.txt 2> err.txt" % prefix)
     ensure_executable(path.join(run_dir, "start.sh"))
 
     # Create a continue.sh file to ease manual relaunch of aborted executions
     with open(path.join(run_dir, "continue.sh"), 'w') as f:
         f.write("#!/bin/bash"
                 "\nsed -i -e \"s/if_restart = .false./if_restart = .true./g\" os-stdin"
-                "\n./osiris >> out.txt 2>> err.txt")
+                "\n./%s osiris >> out.txt 2>> err.txt" % prefix)
     ensure_executable(path.join(run_dir, "continue.sh"))
 
     if mpcaller is not None:
