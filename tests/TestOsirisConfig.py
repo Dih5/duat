@@ -53,6 +53,8 @@ class TestOsirisConfig(unittest.TestCase):
         """Check the same config file is obtained from its fortran code"""
         s = config.ConfigFile(d=1, template="default").to_fortran()
         s2 = config.ConfigFile.from_string(s).to_fortran()
+        # TODO: The order of the parameters in the output is not defined.
+        # A comparison of ConfigFile instances should be implemented instead
         self.assertEqual(_remove_comments(s), _remove_comments(s2))
 
 
