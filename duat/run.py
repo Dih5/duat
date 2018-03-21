@@ -177,11 +177,9 @@ class Run:
         running_mode (str): Can be "local" if a local process was found, "grid" if a grid job was found, or ""
                             otherwise. A simulation launch in the grid but running in the local machine will be tagged
                             as "local" (since you can access its process).
-        process (psutil.Process): If running_mode is "local", representation of the process running the simulation.
+        processes (list of psutil.Process): If running_mode is "local", representation of the processes running the
+                                            simulation.
         job (dict): If running_mode is "grid", information about the job of the simulation.
-        
-    Notes:
-        Only single-process runs are supported at the moment.
         
     """
 
@@ -214,7 +212,7 @@ class Run:
 
         self.total_steps = int((t_max - t_min) // dt) + 1
         self.running_mode = ""
-        self.process = None
+        self.processes = None
         self.job = None
 
         self._update()
@@ -272,12 +270,12 @@ class Run:
             return "Run<%s> [???]" % (self._run_dir_name,)
 
     def _update(self):
-        """Update the process info using what is found at the moment."""
+        """Update the running info using what is found at the moment."""
         candidates = _find_running_exe(path.join(self.run_dir, "osiris"))
 
         try:
             if not candidates:  # No process running found
-                self.process = None
+                self.processes = None
                 # Try to find a job in queue
                 jobs = _get_grid_jobs()
                 if not jobs:  # Either no qstat or empty list
@@ -293,17 +291,13 @@ class Run:
                     else:  # No queued job
                         self.running_mode = ""
 
-            elif len(candidates) > 1:
-                logger.warning("More than one pid was found for the run.\n"
-                               "Multiple processes are not really handled by duat yet, do not trust what you see.")
-                self.process = psutil.Process(candidates[0])
-                self.running_mode = "local"
             else:
+                self.processes = list(map(psutil.Process, candidates))
                 self.running_mode = "local"
-                self.process = psutil.Process(candidates[0])
+
         except psutil.NoSuchProcess:
-            # If the process have died before processing was completed.
-            self.process = None
+            # If the processes have died before processing was completed.
+            self.processes = None
             self.running_mode = ""
 
     def current_step(self):
@@ -378,9 +372,9 @@ class Run:
 
     def terminate(self):
         """
-        Terminate the OSIRIS process (if running).
+        Terminate the OSIRIS processes (if running).
 
-        If runnning is "local", sends SIGINT to the process. If "grid", calls qdel.
+        If runnning is "local", sends SIGINT to the processes. If "grid", calls qdel.
 
         Raises:
             subprocess.CalledProcessError: If using a grid and qdel fails.
@@ -388,11 +382,13 @@ class Run:
         """
         self._update()
         if self.running_mode == "local":
-            try:
-                self.process.terminate()
-            except psutil.NoSuchProcess:
-                # The process has just terminated
-                pass
+            for process in self.processes:
+                try:
+                    process.terminate()
+                except psutil.NoSuchProcess:
+                    # The process has just terminated
+                    # In multiprocess run this is likely to happen when other processes stops.
+                    pass
         elif self.running_mode == "grid":
             subprocess.check_call("qdel %d" % self.job["job_number"], shell=True)
             pass
@@ -401,11 +397,11 @@ class Run:
 
     def kill(self):
         """
-        Abruptly terminate the OSIRIS process (if running).
+        Abruptly terminate the OSIRIS processes (if running).
         
         The :func:`~duat.osiris.run.Run.terminate` method should be used instead to perform a cleaner exit.
 
-        If runnning is "local", sends SIGKILL to the process. If "grid", calls qdel.
+        If runnning is "local", sends SIGKILL to the processes. If "grid", calls qdel.
 
         Raises:
             subprocess.CalledProcessError: If using a grid and qdel fails.
@@ -413,11 +409,13 @@ class Run:
         """
         self._update()
         if self.running_mode == "local":
-            try:
-                self.process.kill()
-            except psutil.NoSuchProcess:
-                # The process has just terminated
-                pass
+            for process in self.processes:
+                try:
+                    process.kill()
+                except psutil.NoSuchProcess:
+                    # The process has just terminated
+                    # In multiprocess run this is likely to happen when other processes stops.
+                    pass
         elif self.running_mode == "grid":
             subprocess.check_call("qdel %d" % self.job["job_number"], shell=True)
             pass
@@ -429,7 +427,10 @@ class Run:
         Estimated time to end the simulation in seconds.
         
         The estimation uses a linear model and considers initialization negligible.
-        The start time of the process is used in the calculation. If the run was resumed, the estimation will be wrong.
+        For local runs, the start time of a process is used in the calculation.
+        For grid runs, the start time of the job is used instead.
+
+        If the run was resumed, the estimation will be wrong.
         
         Returns: 
             float: The estimation of the time to end the simulation or NaN if no estimation could be done.
@@ -439,7 +440,7 @@ class Run:
         if not self.running_mode:
             return 0 if self._is_finished() else float("nan")
         elif self.running_mode == "local":
-            start = self.process.create_time()
+            start = self.processes[0].create_time()
         elif self.running_mode == "grid":
             start = self.job["start_time"]
             if start == 0:
