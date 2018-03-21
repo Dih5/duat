@@ -41,6 +41,5 @@ guide.
 
 
 ## Versioning
-Alpha releases (v0.1.Z) will be intended for personal use and the API may freely change, so do not expect stability yet. 
- 
-However, the Python item access notation for editing the configuration file is unlikely to change, so you may use the package at your own risk expecting only to have to update the running and plotting API. 
+Beta releases will be tagged as v0.Y.Z where Y>1. For this beta releases, Y will increase if and only if backward-incompatible
+public API changes are introduced. 
