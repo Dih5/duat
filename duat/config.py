@@ -4,10 +4,16 @@
 import copy
 import re
 from itertools import product
+from functools import reduce  # py3 needs
+from operator import mul
 
 import numpy as np
 
 from duat.common import ifd, logger
+
+
+def _prod(iterable):
+    return reduce(mul, iterable, 1)
 
 
 def _val_to_fortran(val):
@@ -675,11 +681,16 @@ class ConfigFile(SectionOrdered):
         Get the dimension of the configuration file.
 
         Returns:
-            int: The dimension according to the mandatory xmax parameter in the space section.
+            int: The dimension according to the mandatory xmax parameter in the space section. 0 if it could not be
+                 found.
             
         """
-        x_max = self["space"]["xmax"]
-        return len(x_max) if isinstance(x_max, list) else 1
+        try:
+            x_max = self["space"]["xmax"]
+            return len(x_max) if isinstance(x_max, list) else 1
+
+        except (ValueError, KeyError):  # space or xmax don't exist
+            return 0
 
     def get_nodes(self):
         """
@@ -690,7 +701,8 @@ class ConfigFile(SectionOrdered):
 
         """
         try:
-            return sum(self["node_conf"]["node_number"])
+            nodes = self["node_conf"]["node_number"]
+            return _prod(nodes) if isinstance(nodes, list) else nodes
 
         except (ValueError, KeyError):  # node_conf or node_number don't exist
             return 1
