@@ -538,13 +538,10 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
         tuple: A Run instance describing the execution.
 
     """
-    # Automatic mpirun
+    # Automatic mpirun# Find the needed amount of nodes
+    n = config.get_nodes()
     if prefix is None:
-        try:
-            n = sum(config["node_conf"]["node_number"])
-            prefix = "mpirun -np %d " % n
-        except (ValueError, KeyError):  # node_conf or node_number don't exist
-            prefix = ""
+        prefix = "mpirun -np %d " % n if n > 1 else ""
     elif prefix[-1] != " ":
         prefix += " "
 
@@ -661,14 +658,11 @@ def run_config_grid(config, run_dir, prefix=None, run_name="osiris_run", remote_
                 logger.warning("Could not remove file %s" % f)
 
     # Find the needed amount of nodes
-    try:
-        n = sum(config["node_conf"]["node_number"])
-
-    except (ValueError, KeyError):  # node_conf or node_number don't exist
-        n = 1
-
+    n = config.get_nodes()
     if prefix is None:
         prefix = "mpirun -np %d " % n if n > 1 else ""
+    elif prefix[-1] != " ":
+        prefix += " "
 
     # copy the input file
     ensure_dir_exists(run_dir)

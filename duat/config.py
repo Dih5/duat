@@ -672,7 +672,7 @@ class ConfigFile(SectionOrdered):
 
     def get_d(self):
         """
-        Get the dimension of the configuration filed.
+        Get the dimension of the configuration file.
 
         Returns:
             int: The dimension according to the mandatory xmax parameter in the space section.
@@ -680,6 +680,20 @@ class ConfigFile(SectionOrdered):
         """
         x_max = self["space"]["xmax"]
         return len(x_max) if isinstance(x_max, list) else 1
+
+    def get_nodes(self):
+        """
+        Get the number of nodes required by the instance.
+
+        Returns:
+            int: Number of nodes.
+
+        """
+        try:
+            return sum(self["node_conf"]["node_number"])
+
+        except (ValueError, KeyError):  # node_conf or node_number don't exist
+            return 1
 
 
 class Variation:
