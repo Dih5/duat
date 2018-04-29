@@ -18,6 +18,8 @@ from matplotlib.animation import FuncAnimation, FFMpegWriter
 
 from duat.common import ensure_dir_exists, human_order_key, MPCaller, Call, logger
 
+from bisect import bisect_left, bisect_right
+
 
 def _is_latex(s):
     """
@@ -267,7 +269,9 @@ class Diagnostic:
 
                     * int: Select the item in the given position.
                     * None: No reduction is performed in this axis.
+                    * ScaledFunction: A function applied in a range selected by simulation units.
                     * callable (default): Reduce the data along this axes using the given function (e.g., mean, max, sum...).
+
 
 
             time_selector (slice or ScaledSlice): A slice or ScaledSlice instance selecting the points in time to take.
@@ -318,6 +322,8 @@ class Diagnostic:
                     if sel is not None:
                         if isinstance(sel, int):
                             x = np.take(x, sel, axis=i - offset)
+                        elif isinstance(sel, ScaledFunction):
+                            x = np.apply_along_axis(sel._get_function(self.axes[i]['LIST']), i - offset, x)
                         else:  # Assumed function
                             x = np.apply_along_axis(sel, i - offset, x)
                         offset += 1
@@ -942,3 +948,41 @@ class ScaledSlice:
             return slice(a, b, c)
         else:
             return slice(a, b)
+
+
+class ScaledFunction:
+    """
+    A function that applies to a range defined in simulation units (instead of list position).
+
+    This object can be used to describe a component of an axes_selector parameter.
+
+    """
+
+    def __init__(self, f, start, stop):
+        """
+        Create a ScaledFunction instance.
+
+        Args:
+            f (Callable): The function to be applied to the range, e.g., a sum.
+            start(float): Where the application range should start. Actual start will be before if needed to include
+                          the given point
+            stop(float): Where the slice should stop. Actual stop will be after if needed to include the given point.
+
+        """
+        self.start = start
+        self.stop = stop
+        self.f = f
+
+    def __repr__(self):
+        return "ScaledFunction<(%g, %g, %g)>" % (str(self.function), self.start, self.stop)
+
+    def _get_function(self, l):
+        """Get a function representing the instance for the given list"""
+        m = bisect_right(l, self.start) - 1  # "right" is the new "insertion", so an equal values is still to our left
+        if m < 0:  # It was less than the minimum
+            m = 0
+        # Other half is symmetrical
+        n = bisect_left(l, self.stop) + 1
+        if n >= len(l) + 1:
+            n = len(l)
+        return lambda x: self.f(x[m:n])
