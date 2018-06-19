@@ -9,7 +9,7 @@ sim["grid"]["nx_p"] = 4000
 # Check the generated fortran code
 print(sim)
 ```
-Sections are almost like regular OSIRIS input, although repeatable sections have a `_link` suffix; for example,
+Sections are almost like regular OSIRIS input, although repeatable sections have a `_list` suffix; for example,
 `sim["species_list"][0]` is the first species. See [structure](structure.html) for details.
 
 ## Run a config file
