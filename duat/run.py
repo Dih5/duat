@@ -518,7 +518,8 @@ def _execute_run(prefix, osiris_path, run_dir):
     p.wait()
 
 
-def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, force=None, mpcaller=None):
+def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, force=None, mpcaller=None,
+               create_only=False):
     """
     Initiate a OSIRIS run from a config instance.
 
@@ -534,12 +535,13 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
                      existing processes.
         mpcaller (MPCaller): An instance controlling multithreaded calls. If supplied, all calls will be handled by this
                      instance and the blocking parameter will be ignored.
+        create_only (bool): Whether just to create the files, but not starting the run.
 
     Returns:
         tuple: A Run instance describing the execution.
 
     """
-    # Automatic mpirun# Find the needed amount of nodes
+    # Find the needed amount of nodes
     n = config.get_nodes()
     if prefix is None:
         prefix = "mpirun -np %d " % n if n > 1 else ""
@@ -599,6 +601,9 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
                 "\n./%s osiris >> out.txt 2>> err.txt" % prefix)
     ensure_executable(path.join(run_dir, "continue.sh"))
 
+    if create_only:
+        return Run(run_dir)
+
     if mpcaller is not None:
         run = Run(run_dir)
         # Set the run instance to update the process info when the call is made.
@@ -625,7 +630,7 @@ def run_config(config, run_dir, prefix=None, clean_dir=True, blocking=None, forc
 
 
 def run_config_grid(config, run_dir, prefix=None, run_name="osiris_run", remote_dir=None, clean_dir=True, prolog="",
-                    epilog=""):
+                    epilog="", create_only=False):
     """
     Queue a OSIRIS run in a compatible grid (e.g., Sun Grid Engine).
 
@@ -643,6 +648,7 @@ def run_config_grid(config, run_dir, prefix=None, run_name="osiris_run", remote_
         clean_dir (bool): Whether to remove the files in the directory before execution.
         prolog (str): Shell code to run before calling OSIRIS (but once in the remote_dir if asked for).
         epilog (str): Shell code to run after calling OSIRIS.
+        create_only (bool): Whether just to create the files, but not queueing the run.
 
     Returns:
         Run: A Run instance describing the execution.
@@ -688,7 +694,8 @@ def run_config_grid(config, run_dir, prefix=None, run_name="osiris_run", remote_
         f.write(s)
     ensure_executable(path.join(run_dir, "start.sh"))
 
-    subprocess.Popen("qsub " + path.abspath(path.join(run_dir, "start.sh")), shell=True, cwd=path.abspath(run_dir))
+    if not create_only:
+        subprocess.Popen("qsub " + path.abspath(path.join(run_dir, "start.sh")), shell=True, cwd=path.abspath(run_dir))
 
     return Run(run_dir)
 
@@ -723,7 +730,8 @@ def run_variation(config, variation, run_base, caller=None, on_existing=None, **
         if on_existing not in ["ignore", "overwrite"]:
             raise ValueError("Invalid on_existing parameter")
 
-    if caller is None:
+    # If there is no need for a an MPCaller
+    if caller is None or ("create_only" in kwargs and kwargs["create_only"]):
         for i, c in enumerate(variation.get_generator(config)):
             r = run_config(c, path.join(run_base, "var_" + str(i)), **kwargs)
             r_list.append(r)
